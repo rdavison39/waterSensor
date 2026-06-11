@@ -3,44 +3,92 @@
 #include <WebServer.h>
 #include <ESP_Mail_Client.h>
 
-const char* ssid = "Eldorado";
-const char* password = "Eldorado!";
+#include "secrets.h"
 
 WebServer server(80);
 
 bool waterDetected = false;
+bool alarmEmailSent = false;
+
+unsigned long bootMillis;
+
+String lastAlarmTime = "Never";
 
 #define SMTP_HOST "smtp.gmail.com"
 #define SMTP_PORT 465
 
-#define AUTHOR_EMAIL "ronaldjdavison@gmail.com"
-#define AUTHOR_PASSWORD "abdk khnf rdbu ywjf"
 
-#define RECIPIENT_EMAIL "ronaldjdavison@hotmail.com"
+String getUptime()
+{
+    unsigned long seconds =
+        (millis() - bootMillis) / 1000;
 
-void sendTestEmail()
+    unsigned long days =
+        seconds / 86400;
+
+    seconds %= 86400;
+
+    unsigned long hours =
+        seconds / 3600;
+
+    seconds %= 3600;
+
+    unsigned long minutes =
+        seconds / 60;
+
+    seconds %= 60;
+
+    char buffer[64];
+
+    sprintf(
+        buffer,
+        "%lu d %lu h %lu m %lu s",
+        days,
+        hours,
+        minutes,
+        seconds);
+
+    return String(buffer);
+}
+
+
+void sendEmail(
+    String subject,
+    String body)
 {
     SMTPSession smtp;
 
     ESP_Mail_Session session;
 
-    session.server.host_name = SMTP_HOST;
-    session.server.port = SMTP_PORT;
+    session.server.host_name =
+        SMTP_HOST;
 
-    session.login.email = AUTHOR_EMAIL;
-    session.login.password = AUTHOR_PASSWORD;
+    session.server.port =
+        SMTP_PORT;
+
+    session.login.email =
+        AUTHOR_EMAIL;
+
+    session.login.password =
+        AUTHOR_PASSWORD;
 
     SMTP_Message message;
 
-    message.sender.name = "ESP32 Water Sensor";
-    message.sender.email = AUTHOR_EMAIL;
+    message.sender.name =
+        "ESP32 Water Sensor";
 
-    message.subject = "ESP32 Water Sensor Test";
+    message.sender.email =
+        AUTHOR_EMAIL;
 
-    message.addRecipient("Ron", RECIPIENT_EMAIL);
+    message.subject =
+        subject;
+
+    message.addRecipient(
+        "Ron",
+        RECIPIENT_EMAIL);
 
     message.text.content =
-        "This is a test email from your ESP32 water sensor.";
+        body.c_str();
 
     Serial.println("Connecting to Gmail...");
 
@@ -50,105 +98,266 @@ void sendTestEmail()
         return;
     }
 
-    Serial.println("Sending email...");
-
-    if (!MailClient.sendMail(&smtp, &message))
+    if (!MailClient.sendMail(
+            &smtp,
+            &message))
     {
         Serial.print("Send Error: ");
-        Serial.println(smtp.errorReason());
+        Serial.println(
+            smtp.errorReason());
     }
     else
     {
-        Serial.println("Email Sent Successfully");
+        Serial.println(
+            "Email Sent Successfully");
     }
 
     smtp.closeSession();
 }
 
-void handleRoot()
+
+void sendAlarmEmail()
 {
-    String html;
-
-    html += "<html><body>";
-    html += "<h1>Water Sensor Controller</h1>";
-
-    html += "<p>Status: ";
-
-    if (waterDetected)
-        html += "WET";
-    else
-        html += "DRY";
-
-    html += "</p>";
-
-    html += "<p><a href='/alarm'>Simulate Alarm</a></p>";
-    html += "<p><a href='/reset'>Reset Alarm</a></p>";
-    html += "<p><a href='/testemail'>Send Test Email</a></p>";
-
-    html += "</body></html>";
-
-    server.send(200, "text/html", html);
+    sendEmail(
+        "WATER ALARM DETECTED",
+        "ESP32 detected water.");
 }
 
-void handleAlarm()
+
+void sendTestEmail()
+{
+    sendEmail(
+        "ESP32 Water Sensor Test",
+        "This is a test email.");
+}
+
+
+void triggerAlarm()
 {
     waterDetected = true;
 
-    Serial.println("SIMULATED WATER DETECTED");
+    lastAlarmTime =
+        getUptime();
 
-    server.sendHeader("Location", "/");
-    server.send(302, "text/plain", "");
+    if (!alarmEmailSent)
+    {
+        sendAlarmEmail();
+
+        alarmEmailSent = true;
+    }
 }
+
+
+void handleRoot()
+{
+    String statusColor =
+        waterDetected
+            ? "#dc3545"
+            : "#28a745";
+
+    String statusText =
+        waterDetected
+            ? "WET"
+            : "DRY";
+
+    String html;
+
+    html += "<!DOCTYPE html>";
+    html += "<html>";
+    html += "<head>";
+
+    html += "<meta charset='utf-8'>";
+    html += "<meta name='viewport' content='width=device-width,initial-scale=1'>";
+
+    html += "<style>";
+
+    html += "body{background:#f3f5f7;font-family:Arial;margin:0;padding:0;}";
+
+    html += ".container{max-width:900px;margin:auto;padding:20px;}";
+
+    html += ".card{background:white;border-radius:12px;padding:25px;box-shadow:0 3px 12px rgba(0,0,0,.15);}";
+
+    html += ".title{text-align:center;}";
+
+    html += ".status{font-size:42px;font-weight:bold;text-align:center;color:";
+    html += statusColor;
+    html += ";}";
+
+    html += ".grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}";
+
+    html += ".tile{background:#f7f7f7;padding:15px;border-radius:8px;}";
+
+    html += ".btn{display:inline-block;padding:12px 18px;margin:5px;border-radius:6px;color:white;text-decoration:none;font-weight:bold;}";
+
+    html += ".red{background:#dc3545;}";
+    html += ".green{background:#28a745;}";
+    html += ".blue{background:#007bff;}";
+
+    html += "</style>";
+
+    html += "</head>";
+    html += "<body>";
+
+    html += "<div class='container'>";
+    html += "<div class='card'>";
+
+    html += "<h1 class='title'>💧 ESP32 Water Sensor</h1>";
+
+    html += "<div class='status'>";
+    html += statusText;
+    html += "</div>";
+
+    html += "<br>";
+
+    html += "<div class='grid'>";
+
+    html += "<div class='tile'><b>Uptime</b><br>";
+    html += getUptime();
+    html += "</div>";
+
+    html += "<div class='tile'><b>WiFi Signal</b><br>";
+    html += String(WiFi.RSSI());
+    html += " dBm</div>";
+
+    html += "<div class='tile'><b>Last Alarm</b><br>";
+    html += lastAlarmTime;
+    html += "</div>";
+
+    html += "<div class='tile'><b>Email Sent</b><br>";
+    html += alarmEmailSent ? "YES" : "NO";
+    html += "</div>";
+
+    html += "</div>";
+
+    html += "<br>";
+
+    html += "<a class='btn red' href='/alarm'>Simulate Alarm</a>";
+    html += "<a class='btn green' href='/reset'>Reset Alarm</a>";
+    html += "<a class='btn blue' href='/testemail'>Send Test Email</a>";
+
+    html += "</div>";
+    html += "</div>";
+
+    html += "</body>";
+    html += "</html>";
+
+    server.send(
+        200,
+        "text/html",
+        html);
+}
+
+
+void handleAlarm()
+{
+    Serial.println(
+        "SIMULATED WATER DETECTED");
+
+    triggerAlarm();
+
+    server.sendHeader(
+        "Location",
+        "/");
+
+    server.send(
+        302,
+        "text/plain",
+        "");
+}
+
 
 void handleReset()
 {
     waterDetected = false;
 
-    Serial.println("ALARM RESET");
+    alarmEmailSent = false;
 
-    server.sendHeader("Location", "/");
-    server.send(302, "text/plain", "");
+    Serial.println(
+        "ALARM RESET");
+
+    server.sendHeader(
+        "Location",
+        "/");
+
+    server.send(
+        302,
+        "text/plain",
+        "");
 }
+
 
 void handleTestEmail()
 {
-    Serial.println("Sending Test Email");
+    Serial.println(
+        "Sending Test Email");
 
     sendTestEmail();
 
-    server.sendHeader("Location", "/");
-    server.send(302, "text/plain", "");
+    server.sendHeader(
+        "Location",
+        "/");
+
+    server.send(
+        302,
+        "text/plain",
+        "");
 }
+
 
 void setup()
 {
+    bootMillis =
+        millis();
+
     Serial.begin(115200);
 
-    WiFi.begin(ssid, password);
+    WiFi.begin(
+        WIFI_SSID,
+        WIFI_PASSWORD);
 
     Serial.println();
-    Serial.println("Connecting to WiFi...");
+    Serial.println(
+        "Connecting to WiFi...");
 
-    while (WiFi.status() != WL_CONNECTED)
+    while (
+        WiFi.status() != WL_CONNECTED)
     {
         delay(500);
         Serial.print(".");
     }
 
     Serial.println();
-    Serial.println("WiFi Connected");
-    Serial.print("IP Address: ");
-    Serial.println(WiFi.localIP());
+    Serial.println(
+        "WiFi Connected");
 
-    server.on("/", handleRoot);
-    server.on("/alarm", handleAlarm);
-    server.on("/reset", handleReset);
-    server.on("/testemail", handleTestEmail);
+    Serial.print(
+        "IP Address: ");
+
+    Serial.println(
+        WiFi.localIP());
+
+    server.on(
+        "/",
+        handleRoot);
+
+    server.on(
+        "/alarm",
+        handleAlarm);
+
+    server.on(
+        "/reset",
+        handleReset);
+
+    server.on(
+        "/testemail",
+        handleTestEmail);
 
     server.begin();
 
-    Serial.println("Web Server Started");
+    Serial.println(
+        "Web Server Started");
 }
+
 
 void loop()
 {
