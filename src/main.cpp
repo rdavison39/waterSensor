@@ -24,7 +24,7 @@ unsigned long bootMillis;
 #define SMTP_PORT 465
 
 const bool EMAIL_ENABLED = false;
-#define FIRMWARE_VERSION "2.0.0"
+#define FIRMWARE_VERSION "2.1.0"
 
 // Time and tracking variables
 String lastAlarmTime = "Never";
@@ -33,10 +33,12 @@ String lastStatusEmailDate = "Never";
 int alarmCounter = 0;
 int emailCounter = 0;
 
-// Wet alert variables (4-hour repeating alerts)
+// Wet alert variables (exponential backoff)
 unsigned long lastWetEmailTime = 0;
 int wetEmailCounter = 0;
-#define WET_EMAIL_INTERVAL 14400  // 4 hours in seconds
+int currentAlertIntervalIndex = 0;
+const unsigned long ALERT_INTERVALS[] = {60,120,240,480,960,1920,3600};
+const int NUM_ALERT_INTERVALS = 7;
 
 // Status email days (1st, 8th, 15th, 22nd, 29th)
 const int STATUS_EMAIL_DAYS[] = {1, 8, 15, 22, 29};
@@ -127,12 +129,12 @@ unsigned long getSecondsUntilNextWetEmail()
     time_t now = time(nullptr);
     unsigned long secondsSinceLast = (unsigned long)now - lastWetEmailTime;
     
-    if (secondsSinceLast >= WET_EMAIL_INTERVAL)
+    unsigned long interval = ALERT_INTERVALS[currentAlertIntervalIndex];
+    if (secondsSinceLast >= interval)
     {
-        return 0;  // Ready to send now
+        return 0;
     }
-    
-    return WET_EMAIL_INTERVAL - secondsSinceLast;
+    return interval - secondsSinceLast;
 }
 
 // Function to format seconds as readable string (H:MM:SS)
@@ -276,6 +278,8 @@ void sendWetAlertEmail()
 {
     wetEmailCounter++;
     lastWetEmailTime = (unsigned long)time(nullptr);
+    if (currentAlertIntervalIndex < NUM_ALERT_INTERVALS - 1)
+        currentAlertIntervalIndex++;
     
     String body = "WATER STILL DETECTED - ALERT #" + String(wetEmailCounter) + "\n\n";
     body += "Time: " + getCurrentTime() + "\n";
@@ -347,8 +351,7 @@ void triggerDry()
 {
     waterDetected = false;
     alarmEmailSent = false;
-    wetEmailCounter = 0;
-    lastWetEmailTime = 0;
+    currentAlertIntervalIndex = 0;
 
     Serial.println("SENSOR DRY - ALARM CLEARED");
     addEvent("Sensor returned to DRY");
@@ -470,13 +473,13 @@ void handleRoot()
 
     // Alarm Counter
     html += "<div class='card'>";
-    html += "<div class='card-title'>Alarm Counter</div>";
-    html += "<div class='card-value'>" + String(alarmCounter) + "</div>";
+    html += "<div class='card-title'>Current Interval</div>";
+    html += "<div class='card-value'>" + String(ALERT_INTERVALS[currentAlertIntervalIndex] / 60) + " min</div>";
     html += "</div>";
 
-    // Email Counter
+    // Alerts Sent
     html += "<div class='card'>";
-    html += "<div class='card-title'>Email Counter</div>";
+    html += "<div class='card-title'>Alerts Sent</div>";
     html += "<div class='card-value'>" + String(emailCounter) + "</div>";
     html += "</div>";
 
@@ -529,7 +532,7 @@ void handleRoot()
     // Email Status
     html += "<div class='card'>";
     html += "<div class='card-title'>Email Status</div>";
-    html += "<div class='card-value'>" + String(alarmEmailSent ? "SENT" : "READY") + "</div>";
+    html += "<div class='card-value'>" + String(EMAIL_ENABLED ? (alarmEmailSent ? "SENT" : "READY") : "DISABLED") + "</div>";
     html += "</div>";
 
     html += "</div>";
@@ -714,7 +717,8 @@ void loop()
         time_t now = time(nullptr);
         unsigned long secondsSinceLast = (unsigned long)now - lastWetEmailTime;
         
-        if (secondsSinceLast >= WET_EMAIL_INTERVAL)
+        unsigned long interval = ALERT_INTERVALS[currentAlertIntervalIndex];
+        if (secondsSinceLast >= interval)
         {
             sendWetAlertEmail();
         }
