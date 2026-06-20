@@ -11,10 +11,19 @@ WebServer server(80);
 bool waterDetected = false;
 bool alarmEmailSent = false;
 
+// Sensor pin definitions
+#define WATER_PIN 27
+#define MOTION_PIN 22
+
+// Motion sensor state tracking
+bool motionState = false;
+
 unsigned long bootMillis;
 
 #define SMTP_HOST "smtp.gmail.com"
 #define SMTP_PORT 465
+
+const bool EMAIL_ENABLED = false;
 #define FIRMWARE_VERSION "2.0.0"
 
 // Time and tracking variables
@@ -177,6 +186,12 @@ void sendEmail(
     String subject,
     String body)
 {
+    if (!EMAIL_ENABLED)
+    {
+        Serial.println("EMAIL DISABLED");
+        return;
+    }
+
     SMTPSession smtp;
 
     ESP_Mail_Session session;
@@ -675,6 +690,11 @@ void setup()
 
     Serial.println(
         "Web Server Started");
+
+    // Configure sensor pins
+    pinMode(WATER_PIN, INPUT_PULLUP);
+    pinMode(MOTION_PIN, INPUT);
+    Serial.println("Sensor pins configured: WATER_PIN=27, MOTION_PIN=22");
 }
 
 
@@ -698,5 +718,31 @@ void loop()
         {
             sendWetAlertEmail();
         }
+    }
+
+    // Read hardware sensors
+    int waterStateRaw = digitalRead(WATER_PIN);
+    // Treat HIGH as wet; flip logic here if your sensor is active-low
+    if (waterStateRaw == LOW && !waterDetected)
+    {
+        triggerAlarm();
+        addEvent("Water sensor: WET (hardware)");
+    }
+    else if (waterStateRaw == HIGH && waterDetected)
+    {
+        triggerDry();
+        addEvent("Water sensor: DRY (hardware)");
+    }
+
+    int motionRaw = digitalRead(MOTION_PIN);
+    if (motionRaw == HIGH && !motionState)
+    {
+        motionState = true;
+        addEvent("Motion detected");
+    }
+    else if (motionRaw == LOW && motionState)
+    {
+        motionState = false;
+        addEvent("Motion ended");
     }
 }
