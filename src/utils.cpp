@@ -95,3 +95,18 @@ String getUptime()
     sprintf(buffer, "%lu d %lu h %lu m %lu s", days, hours, minutes, seconds);
     return String(buffer);
 }
+String getWiFiQuality()
+{
+    int rssi = WiFi.RSSI();
+
+    if (rssi >= -60)
+        return "Excellent";
+
+    if (rssi >= -70)
+        return "Good";
+
+    if (rssi >= -80)
+        return "Fair";
+
+    return "Poor";
+}

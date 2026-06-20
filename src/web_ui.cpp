@@ -5,6 +5,7 @@
 #include "email_manager.h"
 #include "water_sensor.h"
 #include "secrets.h"
+#include "motion_sensor.h"
 
 #include <WiFi.h>
 
@@ -68,13 +69,24 @@ void handleRoot()
 
     html += "<div class='card'><div class='card-title'>Current Time</div><div class='card-value'>" + getCurrentTime() + "</div></div>";
     html += "<div class='card'><div class='card-title'>Uptime</div><div class='card-value'>" + getUptime() + "</div></div>";
-    html += "<div class='card'><div class='card-title'>WiFi Signal</div><div class='card-value'>" + String(WiFi.RSSI()) + " dBm</div><div class='wifi-indicator'>" + String(WiFi.RSSI()) + " dBm</div></div>";
+    html += "<div class='card'><div class='card-title'>WiFi Signal</div><div class='card-value'>" + String(WiFi.RSSI()) + " dBm</div><div class='wifi-indicator'>" + getWiFiQuality() + "</div></div>";
     html += "<div class='card'><div class='card-title'>Current Interval</div><div class='card-value'>" + String(ALERT_INTERVALS[currentAlertIntervalIndex] / 60) + " min</div></div>";
     html += "<div class='card'><div class='card-title'>Alerts Sent</div><div class='card-value'>" + String(emailCounter) + "</div></div>";
     html += "<div class='card'><div class='card-title'>Last Alarm</div><div class='card-value'>" + lastAlarmTime + "</div></div>";
     html += "<div class='card'><div class='card-title'>Last Test Email</div><div class='card-value'>" + lastTestEmailTime + "</div></div>";
     html += "<div class='card'><div class='card-title'>Last Status Email</div><div class='card-value'>" + lastStatusEmailDate + "</div></div>";
     html += "<div class='card'><div class='card-title'>Alert Email To</div><div class='card-value'>" + String(RECIPIENT_EMAIL) + "</div></div>";
+    html += "<div class='card'><div class='card-title'>Motion Status</div><div class='card-value'>";
+html += isMotionDetected() ? "ACTIVE" : "IDLE";
+html += "</div></div>";
+
+html += "<div class='card'><div class='card-title'>Motion Count</div><div class='card-value'>";
+html += String(getMotionCount());
+html += "</div></div>";
+
+html += "<div class='card'><div class='card-title'>Last Motion</div><div class='card-value'>";
+html += getLastMotionTime();
+html += "</div></div>";
 
     if (waterDetected)
     {

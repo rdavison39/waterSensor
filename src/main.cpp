@@ -34,6 +34,11 @@ const int NUM_ALERT_INTERVALS = 7;
 const int STATUS_EMAIL_DAYS[] = {1, 8, 15, 22, 29};
 const int NUM_STATUS_DAYS = 5;
 
+//motion
+unsigned long motionCount = 0;
+String lastMotionTime = "Never";
+
+
 void setup()
 {
     bootMillis = millis();

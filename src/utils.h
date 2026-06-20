@@ -11,5 +11,6 @@ String getWiFiColor();
 unsigned long getSecondsUntilNextWetEmail();
 String formatSecondsToTime(unsigned long seconds);
 String getUptime();
+String getWiFiQuality();
 
 #endif // UTILS_H

@@ -6,4 +6,8 @@
 void setupMotionSensor();
 void loopMotionSensor();
 
+bool isMotionDetected();
+unsigned long getMotionCount();
+String getLastMotionTime();
+
 #endif // MOTION_SENSOR_H

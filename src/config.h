@@ -7,7 +7,7 @@
 // Pin and firmware configuration
 #define WATER_PIN 27
 #define MOTION_PIN 22
-#define FIRMWARE_VERSION "2.1.0"
+#define FIRMWARE_VERSION "3.0.0"
 
 // Email / SMTP
 #define SMTP_HOST "smtp.gmail.com"
@@ -41,5 +41,10 @@ extern const int STATUS_EMAIL_DAYS[];
 extern const int NUM_STATUS_DAYS;
 
 #define MAX_EVENTS 10
+
+// Motion 
+extern unsigned long motionCount;
+extern String lastMotionTime;
+
 
 #endif // CONFIG_H
