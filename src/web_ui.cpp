@@ -6,6 +6,7 @@
 #include "water_sensor.h"
 #include "secrets.h"
 #include "motion_sensor.h"
+#include "settings.h"
 
 #include <WiFi.h>
 
@@ -79,46 +80,46 @@ void handleRoot()
     html += "@media(max-width:768px){.grid{grid-template-columns:1fr;}.title{font-size:1.8em;}.status-box{padding:30px 40px;}.btn{padding:12px 20px;font-size:0.9em;}}";
     html += "</style>";
 
-html += "<script>";
-html += "function updateDashboard(){";
-html += "fetch('/status')";
-html += ".then(r=>r.json())";
-html += ".then(d=>{";
+    html += "<script>";
+    html += "function updateDashboard(){";
+    html += "fetch('/status')";
+    html += ".then(r=>r.json())";
+    html += ".then(d=>{";
 
-html += "var e=document.getElementById('waterStatus');";
-html += "if(e)e.innerHTML=d.waterStatus;";
+    html += "var e=document.getElementById('waterStatus');";
+    html += "if(e)e.innerHTML=d.waterStatus;";
 
-html += "e=document.getElementById('statusBox');";
-html += "if(e)e.style.background=d.waterColor;";
+    html += "e=document.getElementById('statusBox');";
+    html += "if(e)e.style.background=d.waterColor;";
 
-html += "e=document.getElementById('currentTime');";
-html += "if(e)e.innerHTML=d.currentTime;";
+    html += "e=document.getElementById('currentTime');";
+    html += "if(e)e.innerHTML=d.currentTime;";
 
-html += "e=document.getElementById('motionStatus');";
-html += "if(e)e.innerHTML=d.motionStatus;";
+    html += "e=document.getElementById('motionStatus');";
+    html += "if(e)e.innerHTML=d.motionStatus;";
 
-html += "e=document.getElementById('motionCount');";
-html += "if(e)e.innerHTML=d.motionCount;";
+    html += "e=document.getElementById('motionCount');";
+    html += "if(e)e.innerHTML=d.motionCount;";
 
-html += "e=document.getElementById('lastMotion');";
-html += "if(e)e.innerHTML=d.lastMotion;";
+    html += "e=document.getElementById('lastMotion');";
+    html += "if(e)e.innerHTML=d.lastMotion;";
 
-html += "e=document.getElementById('lastMotionEmail');";
-html += "if(e)e.innerHTML=d.lastMotionEmail;";
+    html += "e=document.getElementById('lastMotionEmail');";
+    html += "if(e)e.innerHTML=d.lastMotionEmail;";
 
-html += "console.log('Dashboard updated', d);";
+    html += "console.log('Dashboard updated', d);";
 
-html += "})";
-html += ".catch(err=>console.log('AJAX Error',err));";
+    html += "})";
+    html += ".catch(err=>console.log('AJAX Error',err));";
 
-html += "}";
+    html += "}";
 
-html += "window.onload=function(){";
-html += "updateDashboard();";
-html += "setInterval(updateDashboard,2000);";
-html += "};";
+    html += "window.onload=function(){";
+    html += "updateDashboard();";
+    html += "setInterval(updateDashboard,2000);";
+    html += "};";
 
-html += "</script>";
+    html += "</script>";
 
     html += "</head>";
     html += "<body>";
@@ -129,34 +130,47 @@ html += "</script>";
     html += "<p class='version'>Firmware v" + String(FIRMWARE_VERSION) + "</p>";
     html += "</div>";
 
-html += "<div class='status-container'>";
-html += "<div class='status-box' id='statusBox'>";
-html += "<svg class='water-droplet' viewBox='0 0 24 24' fill='white'>";
-html += "<path d='M12 2.69l5.66 5.66a8 8 0 1 1-11.32 0z'/>";
-html += "</svg>";
+    html += "<div class='status-container'>";
+    html += "<div class='status-box' id='statusBox'>";
+    html += "<svg class='water-droplet' viewBox='0 0 24 24' fill='white'>";
+    html += "<path d='M12 2.69l5.66 5.66a8 8 0 1 1-11.32 0z'/>";
+    html += "</svg>";
 
-html += "<p class='status-text' id='waterStatus'>";
-html += statusText;
-html += "</p>";
+    html += "<p class='status-text' id='waterStatus'>";
+    html += statusText;
+    html += "</p>";
 
-html += "</div>";
-html += "</div>";
+    html += "</div>";
+    html += "</div>";
 
     html += "<div class='grid'>";
 
+    html += "<div class='card'><div class='card-title'>Sensor 1</div><div class='card-value'>";
+    html += sensor1Detected ? "WET" : "DRY";
+    html += "</div></div>";
+
+    html += "<div class='card'><div class='card-title'>Sensor 2</div><div class='card-value'>";
+    html += sensor2Detected ? "WET" : "DRY";
+    html += "</div></div>";
     html += "<div class='card'><div class='card-title'>Current Time</div><div class='card-value' id='currentTime'>" + getCurrentTime() + "</div></div>";
     html += "<div class='card'><div class='card-title'>Uptime</div><div class='card-value'>" + getUptime() + "</div></div>";
     html += "<div class='card'><div class='card-title'>WiFi Signal</div><div class='card-value'>" + String(WiFi.RSSI()) + " dBm</div><div class='wifi-indicator'>" + getWiFiQuality() + "</div></div>";
-    html += "<div class='card'><div class='card-title'>Current Interval</div><div class='card-value'>" + String(ALERT_INTERVALS[currentAlertIntervalIndex] / 60) + " min</div></div>";
+    html += "<div class='card'><div class='card-title'>Current Interval (WET)</div><div class='card-value'>" + String(ALERT_INTERVALS[currentAlertIntervalIndex] / 60) + " min</div></div>";
     html += "<div class='card'><div class='card-title'>Alerts Sent</div><div class='card-value'>" + String(emailCounter) + "</div></div>";
     html += "<div class='card'><div class='card-title'>Last Alarm</div><div class='card-value'>" + lastAlarmTime + "</div></div>";
     html += "<div class='card'><div class='card-title'>Last Test Email</div><div class='card-value'>" + lastTestEmailTime + "</div></div>";
+    html += "<div class='card'><div class='card-title'>Alert Email To</div><div class='card-value'>" + getRecipientEmails() + "</div></div>";
     html += "<div class='card'><div class='card-title'>Last Status Email</div><div class='card-value'>" + lastStatusEmailDate + "</div></div>";
-    html += "<div class='card'><div class='card-title'>Alert Email To</div><div class='card-value'>" + String(RECIPIENT_EMAILS) + "</div></div>";
 
-html += "<div class='card'><div class='card-title'>Motion Status</div><div class='card-value' id='motionStatus'>";
-html += isMotionDetected() ? "ACTIVE" : "IDLE";
-html += "</div></div>";
+    html += "<div class='card'><div class='card-title'>Email Notifications</div><div class='card-value'>";
+    html += getEmailEnabled() ? "ENABLED" : "DISABLED";
+    html += "</div></div>";
+    html += "<div class='card'><div class='card-title'>Heartbeat Interval</div><div class='card-value'>";
+    html += String(getHeartbeatIntervalDays()) + " days";
+    html += "</div></div>";
+    html += "<div class='card'><div class='card-title'>Motion Status</div><div class='card-value' id='motionStatus'>";
+    html += isMotionDetected() ? "ACTIVE" : "IDLE";
+    html += "</div></div>";
 
     html += "<div class='card'><div class='card-title'>Motion Count</div><div class='card-value' id='motionCount'>";
     html += String(getMotionCount());
@@ -186,7 +200,9 @@ html += "</div></div>";
         html += "</div>";
     }
 
-    html += "<div class='card'><div class='card-title'>Email Status</div><div class='card-value'>" + String(EMAIL_ENABLED ? (alarmEmailSent ? "SENT" : "READY") : "DISABLED") + "</div></div>";
+    html += "<div class='card'><div class='card-title'>Email Status</div><div class='card-value'>";
+    html += getEmailEnabled() ? "ENABLED" : "DISABLED";
+    html += "</div></div>";
 
     html += "</div>";
 
@@ -206,6 +222,7 @@ html += "</div></div>";
     html += "<a class='btn btn-alarm' href='/wet'>Simulate Sensor Wet</a>";
     html += "<a class='btn btn-reset' href='/dry'>Simulate Sensor Dry</a>";
     html += "<a class='btn btn-test' href='/testemail'>Send Test Email</a>";
+    html += "<a class='btn btn-test' href='/settings'>⚙ Settings</a>";
     html += "</div>";
 
     html += "</div></body></html>";
@@ -238,12 +255,119 @@ void handleTestEmail()
     server.sendHeader("Location", "/");
     server.send(302, "text/plain", "");
 }
+void handleSettings()
+{
+    String html;
 
+    html += "<!DOCTYPE html><html><head>";
+    html += "<meta charset='utf-8'>";
+    html += "<meta name='viewport' content='width=device-width,initial-scale=1'>";
+    html += "<title>Settings</title>";
+
+    html += "<style>";
+    html += "body{background:#1a1a1a;color:#ecf0f1;font-family:Arial;padding:20px;}";
+    html += ".container{max-width:800px;margin:auto;}";
+    html += "input{width:100%;padding:12px;margin-top:5px;margin-bottom:20px;font-size:16px;}";
+    html += ".btn{display:inline-block;padding:12px 20px;background:#3498db;color:white;text-decoration:none;border:none;border-radius:6px;cursor:pointer;margin-right:10px;}";
+    html += "</style>";
+    html += "</head><body>";
+
+    html += "<div class='container'>";
+    html += "<h1>⚙ Settings</h1>";
+    if (server.hasArg("saved"))
+    {
+        html += "<div style='background:#27ae60;";
+        html += "padding:15px;";
+        html += "margin-bottom:20px;";
+        html += "border-radius:8px;";
+        html += "font-weight:bold;'>";
+        html += "✓ Settings saved successfully";
+        html += "</div>";
+    }
+
+    html += "<form method='POST' action='/savesettings'>";
+
+    html += "<label>Email Recipients</label>";
+    html += "<input type='text' name='emails' value='" + getRecipientEmails() + "'>";
+
+    html += "<label>Motion Email Cooldown (Minutes)</label>";
+    html += "<input type='number' min='1' max='1440' ";
+    html += "name='motionCooldown' value='";
+    html += String(getMotionEmailCooldownMinutes());
+    html += "'>";
+
+    html += "<label>Heartbeat Interval (Days)</label>";
+    html += "<input type='number' min='1' max='365' name='heartbeat' value='" + String(getHeartbeatIntervalDays()) + "'>";
+
+    html += "<label>";
+    html += "<label style='display:flex;";
+    html += "align-items:center;";
+    html += "gap:15px;";
+    html += "font-size:24px;";
+    html += "margin-bottom:25px;'>";
+
+    html += "<input type='checkbox' ";
+    html += "name='emailEnabled' ";
+
+    if (getEmailEnabled())
+    {
+        html += "checked ";
+    }
+
+    html += "style='width:28px;";
+    html += "height:28px;";
+    html += "margin:0;'>";
+
+    html += "<span>Enable Email Notifications</span>";
+
+    html += "</label>";
+
+    html += "<br><br>";
+
+    html += "<button class='btn' type='submit'>Save Settings</button>";
+    html += "<a class='btn' href='/'>Back To Dashboard</a>";
+
+    html += "</form>";
+    html += "</div>";
+    html += "</body></html>";
+
+    server.send(200, "text/html", html);
+}
+
+void handleSaveSettings()
+{
+    if (server.hasArg("emails"))
+    {
+        setRecipientEmails(server.arg("emails"));
+    }
+
+    if (server.hasArg("heartbeat"))
+    {
+        setHeartbeatIntervalDays(server.arg("heartbeat").toInt());
+    }
+    if (server.hasArg("motionCooldown"))
+{
+    setMotionEmailCooldownMinutes(
+        server.arg("motionCooldown").toInt());
+}
+
+    bool emailEnabled = server.hasArg("emailEnabled");
+    setEmailEnabled(emailEnabled);
+    addEvent("Settings updated");
+
+    server.sendHeader("Location", "/settings?saved=1");
+    server.send(302, "text/plain", "");
+}
 void setupWebUI()
 {
     server.on("/", handleRoot);
+
     server.on("/wet", handleSimulateWet);
     server.on("/dry", handleSimulateDry);
     server.on("/testemail", handleTestEmail);
+
     server.on("/status", handleStatus);
+
+    server.on("/settings", HTTP_GET, handleSettings);
+    server.on("/savesettings", HTTP_POST, handleSaveSettings);
 }

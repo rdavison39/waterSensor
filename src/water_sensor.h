@@ -3,6 +3,9 @@
 
 #include <Arduino.h>
 
+extern bool sensor1Detected;
+extern bool sensor2Detected;
+
 void setupWaterSensor();
 void loopWaterSensor();
 void triggerAlarm();

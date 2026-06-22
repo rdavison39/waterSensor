@@ -5,7 +5,8 @@
 #include <WebServer.h>
 
 // Pin and firmware configuration
-#define WATER_PIN 27
+#define WATER_SENSOR_1_PIN 27
+#define WATER_SENSOR_2_PIN 26
 #define MOTION_PIN 22
 #define FIRMWARE_VERSION "3.1.0"
 
@@ -46,9 +47,6 @@ extern const int NUM_STATUS_DAYS;
 extern unsigned long motionCount;
 extern String lastMotionTime;
 extern String lastMotionEmailTimestamp;
-
-// Heartbeat
-extern String lastHeartbeatDate;
 
 
 #endif // CONFIG_H

@@ -3,6 +3,7 @@
 #include "event_log.h"
 #include "utils.h"
 #include "email_manager.h"
+#include "settings.h"
 
 #include <WiFi.h>
 
@@ -25,7 +26,8 @@ void loopMotionSensor()
     static unsigned long lastMotionEmailMillis = 0;
     static bool firstMotionEmail = true;
 
-    const unsigned long MOTION_EMAIL_COOLDOWN = 15UL * 60UL * 1000UL; // 15 minutes
+unsigned long cooldownMillis =
+    getMotionEmailCooldownMinutes() * 60UL * 1000UL;
 
     int motionRaw = digitalRead(MOTION_PIN);
 
@@ -64,8 +66,8 @@ void loopMotionSensor()
 
         unsigned long now = millis();
 
-        if (firstMotionEmail ||
-            (now - lastMotionEmailMillis) > MOTION_EMAIL_COOLDOWN)
+if (firstMotionEmail ||
+    (now - lastMotionEmailMillis) > cooldownMillis)
         {
             if (EMAIL_ENABLED)
             {
@@ -95,8 +97,8 @@ void loopMotionSensor()
         }
         else
         {
-            unsigned long remaining =
-                (MOTION_EMAIL_COOLDOWN - (now - lastMotionEmailMillis)) / 1000;
+unsigned long remaining =
+    (cooldownMillis - (now - lastMotionEmailMillis)) / 1000;
 
             Serial.print("[");
             Serial.print(getCurrentTime());

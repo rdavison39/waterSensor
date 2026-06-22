@@ -8,5 +8,6 @@ void sendAlarmEmail();
 void sendWetAlertEmail();
 void sendTestEmail();
 void sendStatusEmail();
+void sendStartupEmail();
 
 #endif // EMAIL_MANAGER_H
