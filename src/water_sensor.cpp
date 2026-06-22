@@ -10,11 +10,13 @@ void setupWaterSensor()
 
 void triggerAlarm()
 {
+
     waterDetected = true;
     alarmCounter++;
 
     if (!alarmEmailSent)
     {
+        Serial.println("[EMAIL] Source: Water Alarm");
         sendAlarmEmail();
         addEvent("Water alarm triggered!");
         alarmEmailSent = true;
@@ -23,6 +25,8 @@ void triggerAlarm()
 
 void triggerDry()
 {
+
+
     waterDetected = false;
     alarmEmailSent = false;
     currentAlertIntervalIndex = 0;
@@ -33,15 +37,45 @@ void triggerDry()
 
 void loopWaterSensor()
 {
+    static int lastRawState = HIGH;
+    static unsigned long stateChangeMillis = 0;
+
     int waterStateRaw = digitalRead(WATER_PIN);
-    // Sensor wired with pullup: LOW means wet
-    if (waterStateRaw == LOW && !waterDetected)
+
+    // detect raw state change
+    if (waterStateRaw != lastRawState)
     {
+        lastRawState = waterStateRaw;
+        stateChangeMillis = millis();
+
+if (waterStateRaw == LOW)
+{
+    Serial.println("[WATER] Pin LOW (WET)");
+}
+else
+{
+    Serial.println("[WATER] Pin HIGH (DRY)");
+}
+    }
+
+    // WET debounce (2 seconds)
+    if (waterStateRaw == LOW &&
+        !waterDetected &&
+        (millis() - stateChangeMillis) >= 2000)
+    {
+        Serial.println("*** WATER CONFIRMED WET ***");
+
         triggerAlarm();
         addEvent("Water sensor: WET (hardware)");
     }
-    else if (waterStateRaw == HIGH && waterDetected)
+
+    // DRY debounce (60 seconds)
+    if (waterStateRaw == HIGH &&
+        waterDetected &&
+        (millis() - stateChangeMillis) >= 60000)
     {
+        Serial.println("*** WATER CONFIRMED DRY ***");
+
         triggerDry();
         addEvent("Water sensor: DRY (hardware)");
     }

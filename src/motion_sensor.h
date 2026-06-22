@@ -9,5 +9,6 @@ void loopMotionSensor();
 bool isMotionDetected();
 unsigned long getMotionCount();
 String getLastMotionTime();
+String getLastMotionEmailTime();
 
 #endif // MOTION_SENSOR_H

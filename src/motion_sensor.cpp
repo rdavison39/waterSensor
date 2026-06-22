@@ -6,6 +6,14 @@
 
 #include <WiFi.h>
 
+static void motionLog(const String& msg)
+{
+    Serial.print("[");
+    Serial.print(getCurrentTime());
+    Serial.print("] ");
+    Serial.println(msg);
+}
+
 void setupMotionSensor()
 {
     pinMode(MOTION_PIN, INPUT);
@@ -14,14 +22,19 @@ void setupMotionSensor()
 void loopMotionSensor()
 {
     static int lastRawState = -1;
-    static unsigned long lastMotionEmailTime = 0;
+    static unsigned long lastMotionEmailMillis = 0;
+    static bool firstMotionEmail = true;
+
+    const unsigned long MOTION_EMAIL_COOLDOWN = 15UL * 60UL * 1000UL; // 15 minutes
 
     int motionRaw = digitalRead(MOTION_PIN);
 
     // Debug raw pin changes
     if (motionRaw != lastRawState)
     {
-        Serial.print("[MOTION] Raw Pin Changed: ");
+        Serial.print("[");
+        Serial.print(getCurrentTime());
+        Serial.print("] [MOTION] Raw Pin Changed: ");
         Serial.println(motionRaw);
 
         lastRawState = motionRaw;
@@ -35,22 +48,28 @@ void loopMotionSensor()
 
         lastMotionTime = getCurrentTime();
 
-        Serial.println("[MOTION] Motion detected");
-        Serial.print("[MOTION] Count: ");
+        motionLog("[MOTION] Motion detected");
+
+        Serial.print("[");
+        Serial.print(getCurrentTime());
+        Serial.print("] [MOTION] Count: ");
         Serial.println(motionCount);
-        Serial.print("[MOTION] Time: ");
+
+        Serial.print("[");
+        Serial.print(getCurrentTime());
+        Serial.print("] [MOTION] Time: ");
         Serial.println(lastMotionTime);
 
         addEvent("Motion detected");
 
-        if (EMAIL_ENABLED)
-        {
-            unsigned long now = millis();
+        unsigned long now = millis();
 
-            // 5 minute cooldown between motion emails
-            if ((now - lastMotionEmailTime) > 300000UL)
+        if (firstMotionEmail ||
+            (now - lastMotionEmailMillis) > MOTION_EMAIL_COOLDOWN)
+        {
+            if (EMAIL_ENABLED)
             {
-                Serial.println("[MOTION] Sending motion email");
+                motionLog("[MOTION] Sending motion email");
 
                 String subject = "ESP32 Motion Detected";
 
@@ -61,25 +80,36 @@ void loopMotionSensor()
                 body += "IP Address: " + WiFi.localIP().toString() + "\n";
                 body += "Status: ACTIVE\n";
 
+                Serial.println("[EMAIL] Source: Motion");
                 sendEmail(subject, body);
 
-                lastMotionEmailTime = now;
+                lastMotionEmailTimestamp = lastMotionTime;
             }
             else
             {
-                Serial.println("[MOTION] Email suppressed (cooldown active)");
+                motionLog("[MOTION] Email disabled");
             }
+
+            firstMotionEmail = false;
+            lastMotionEmailMillis = now;
         }
         else
         {
-            Serial.println("[MOTION] Email disabled");
+            unsigned long remaining =
+                (MOTION_EMAIL_COOLDOWN - (now - lastMotionEmailMillis)) / 1000;
+
+            Serial.print("[");
+            Serial.print(getCurrentTime());
+            Serial.print("] [MOTION] Email suppressed (cooldown active) - ");
+            Serial.print(remaining);
+            Serial.println(" seconds remaining");
         }
     }
     else if (motionRaw == LOW && motionState)
     {
         motionState = false;
 
-        Serial.println("[MOTION] Motion ended");
+        motionLog("[MOTION] Motion ended");
 
         addEvent("Motion ended");
     }
@@ -98,4 +128,9 @@ unsigned long getMotionCount()
 String getLastMotionTime()
 {
     return lastMotionTime;
+}
+
+String getLastMotionEmailTime()
+{
+    return lastMotionEmailTimestamp;
 }

@@ -37,6 +37,7 @@ const int NUM_STATUS_DAYS = 5;
 //motion
 unsigned long motionCount = 0;
 String lastMotionTime = "Never";
+String lastMotionEmailTimestamp = "Never";
 
 
 void setup()

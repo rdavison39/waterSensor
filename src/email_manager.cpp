@@ -8,6 +8,12 @@
 
 void sendEmail(const String &subject, const String &body)
 {
+        Serial.println("================================");
+    Serial.println("[EMAIL] SEND REQUEST");
+    Serial.print("[EMAIL] Subject: ");
+    Serial.println(subject);
+    Serial.println("================================");
+    
     if (!EMAIL_ENABLED)
     {
         Serial.println("EMAIL DISABLED");
@@ -27,7 +33,33 @@ void sendEmail(const String &subject, const String &body)
     message.sender.name = "ESP32 Water Sensor";
     message.sender.email = AUTHOR_EMAIL;
     message.subject = subject;
-    message.addRecipient("Ron", RECIPIENT_EMAIL);
+    String recipients = RECIPIENT_EMAILS;
+
+    int start = 0;
+    while (start < recipients.length())
+    {
+    int comma = recipients.indexOf(',', start);
+
+    String email;
+
+    if (comma == -1)
+    {
+        email = recipients.substring(start);
+        start = recipients.length();
+    }
+    else
+    {
+        email = recipients.substring(start, comma);
+        start = comma + 1;
+    }
+
+    email.trim();
+
+    if (email.length() > 0)
+    {
+        message.addRecipient(email.c_str(), email.c_str());
+    }
+  }
     message.text.content = body.c_str();
 
     Serial.println("Connecting to Gmail...");

@@ -9,6 +9,33 @@
 
 #include <WiFi.h>
 
+void handleStatus()
+{
+    String json = "{";
+
+    json += "\"currentTime\":\"" + getCurrentTime() + "\",";
+
+    json += "\"waterStatus\":\"";
+    json += (waterDetected ? "WET" : "DRY");
+    json += "\",";
+
+    json += "\"waterColor\":\"";
+    json += (waterDetected ? "#e74c3c" : "#27ae60");
+    json += "\",";
+
+    json += "\"motionStatus\":\"";
+    json += (isMotionDetected() ? "ACTIVE" : "IDLE");
+    json += "\",";
+
+    json += "\"motionCount\":\"" + String(getMotionCount()) + "\",";
+    json += "\"lastMotion\":\"" + getLastMotionTime() + "\",";
+    json += "\"lastMotionEmail\":\"" + getLastMotionEmailTime() + "\"";
+
+    json += "}";
+
+    server.send(200, "application/json", json);
+}
+
 void handleRoot()
 {
     String statusColor = waterDetected ? "#e74c3c" : "#27ae60";
@@ -16,13 +43,14 @@ void handleRoot()
     String wifiColor = getWiFiColor();
 
     String html;
+
     html += "<!DOCTYPE html>";
     html += "<html>";
     html += "<head>";
     html += "<meta charset='utf-8'>";
     html += "<meta name='viewport' content='width=device-width,initial-scale=1'>";
-    html += "<meta http-equiv='refresh' content='30'>";
     html += "<title>ESP32 Water Sensor</title>";
+
     html += "<style>";
     html += "body{background:#1a1a1a;color:#ecf0f1;font-family:'Segoe UI',Arial,sans-serif;margin:0;padding:0;}";
     html += ".container{max-width:1200px;margin:auto;padding:20px;}";
@@ -50,24 +78,73 @@ void handleRoot()
     html += ".btn-test{background:#3498db;}";
     html += "@media(max-width:768px){.grid{grid-template-columns:1fr;}.title{font-size:1.8em;}.status-box{padding:30px 40px;}.btn{padding:12px 20px;font-size:0.9em;}}";
     html += "</style>";
+
+html += "<script>";
+html += "function updateDashboard(){";
+html += "fetch('/status')";
+html += ".then(r=>r.json())";
+html += ".then(d=>{";
+
+html += "var e=document.getElementById('waterStatus');";
+html += "if(e)e.innerHTML=d.waterStatus;";
+
+html += "e=document.getElementById('statusBox');";
+html += "if(e)e.style.background=d.waterColor;";
+
+html += "e=document.getElementById('currentTime');";
+html += "if(e)e.innerHTML=d.currentTime;";
+
+html += "e=document.getElementById('motionStatus');";
+html += "if(e)e.innerHTML=d.motionStatus;";
+
+html += "e=document.getElementById('motionCount');";
+html += "if(e)e.innerHTML=d.motionCount;";
+
+html += "e=document.getElementById('lastMotion');";
+html += "if(e)e.innerHTML=d.lastMotion;";
+
+html += "e=document.getElementById('lastMotionEmail');";
+html += "if(e)e.innerHTML=d.lastMotionEmail;";
+
+html += "console.log('Dashboard updated', d);";
+
+html += "})";
+html += ".catch(err=>console.log('AJAX Error',err));";
+
+html += "}";
+
+html += "window.onload=function(){";
+html += "updateDashboard();";
+html += "setInterval(updateDashboard,2000);";
+html += "};";
+
+html += "</script>";
+
     html += "</head>";
     html += "<body>";
     html += "<div class='container'>";
+
     html += "<div class='header'>";
     html += "<h1 class='title'>💧 Water Sensor Dashboard</h1>";
     html += "<p class='version'>Firmware v" + String(FIRMWARE_VERSION) + "</p>";
     html += "</div>";
-    html += "<div class='status-container'>";
-    html += "<div class='status-box'>";
-    html += "<svg class='water-droplet' viewBox='0 0 24 24' fill='white'>";
-    html += "<path d='M12 2.69l5.66 5.66a8 8 0 1 1-11.32 0z'/>";
-    html += "</svg>";
-    html += "<p class='status-text'>" + statusText + "</p>";
-    html += "</div>";
-    html += "</div>";
+
+html += "<div class='status-container'>";
+html += "<div class='status-box' id='statusBox'>";
+html += "<svg class='water-droplet' viewBox='0 0 24 24' fill='white'>";
+html += "<path d='M12 2.69l5.66 5.66a8 8 0 1 1-11.32 0z'/>";
+html += "</svg>";
+
+html += "<p class='status-text' id='waterStatus'>";
+html += statusText;
+html += "</p>";
+
+html += "</div>";
+html += "</div>";
+
     html += "<div class='grid'>";
 
-    html += "<div class='card'><div class='card-title'>Current Time</div><div class='card-value'>" + getCurrentTime() + "</div></div>";
+    html += "<div class='card'><div class='card-title'>Current Time</div><div class='card-value' id='currentTime'>" + getCurrentTime() + "</div></div>";
     html += "<div class='card'><div class='card-title'>Uptime</div><div class='card-value'>" + getUptime() + "</div></div>";
     html += "<div class='card'><div class='card-title'>WiFi Signal</div><div class='card-value'>" + String(WiFi.RSSI()) + " dBm</div><div class='wifi-indicator'>" + getWiFiQuality() + "</div></div>";
     html += "<div class='card'><div class='card-title'>Current Interval</div><div class='card-value'>" + String(ALERT_INTERVALS[currentAlertIntervalIndex] / 60) + " min</div></div>";
@@ -75,42 +152,54 @@ void handleRoot()
     html += "<div class='card'><div class='card-title'>Last Alarm</div><div class='card-value'>" + lastAlarmTime + "</div></div>";
     html += "<div class='card'><div class='card-title'>Last Test Email</div><div class='card-value'>" + lastTestEmailTime + "</div></div>";
     html += "<div class='card'><div class='card-title'>Last Status Email</div><div class='card-value'>" + lastStatusEmailDate + "</div></div>";
-    html += "<div class='card'><div class='card-title'>Alert Email To</div><div class='card-value'>" + String(RECIPIENT_EMAIL) + "</div></div>";
-    html += "<div class='card'><div class='card-title'>Motion Status</div><div class='card-value'>";
+    html += "<div class='card'><div class='card-title'>Alert Email To</div><div class='card-value'>" + String(RECIPIENT_EMAILS) + "</div></div>";
+
+html += "<div class='card'><div class='card-title'>Motion Status</div><div class='card-value' id='motionStatus'>";
 html += isMotionDetected() ? "ACTIVE" : "IDLE";
 html += "</div></div>";
 
-html += "<div class='card'><div class='card-title'>Motion Count</div><div class='card-value'>";
-html += String(getMotionCount());
-html += "</div></div>";
+    html += "<div class='card'><div class='card-title'>Motion Count</div><div class='card-value' id='motionCount'>";
+    html += String(getMotionCount());
+    html += "</div></div>";
 
-html += "<div class='card'><div class='card-title'>Last Motion</div><div class='card-value'>";
-html += getLastMotionTime();
-html += "</div></div>";
+    html += "<div class='card'><div class='card-title'>Last Motion</div><div class='card-value' id='lastMotion'>";
+    html += getLastMotionTime();
+    html += "</div></div>";
+
+    html += "<div class='card'><div class='card-title'>Last Motion Email</div><div class='card-value' id='lastMotionEmail'>";
+    html += getLastMotionEmailTime();
+    html += "</div></div>";
 
     if (waterDetected)
     {
         unsigned long secondsUntilNext = getSecondsUntilNextWetEmail();
+
         html += "<div class='card'><div class='card-title'>Wet Alerts Sent</div><div class='card-value'>" + String(wetEmailCounter) + "</div></div>";
+
         html += "<div class='card'><div class='card-title'>Next Alert In</div>";
+
         if (secondsUntilNext == 0)
             html += "<div class='card-value' style='color:#f39c12;'>READY NOW</div>";
         else
             html += "<div class='card-value'>" + formatSecondsToTime(secondsUntilNext) + "</div>";
+
         html += "</div>";
     }
 
     html += "<div class='card'><div class='card-title'>Email Status</div><div class='card-value'>" + String(EMAIL_ENABLED ? (alarmEmailSent ? "SENT" : "READY") : "DISABLED") + "</div></div>";
 
-    html += "</div>"; // grid
+    html += "</div>";
 
     html += "<div class='events-container'><h2 class='events-title'>Last 10 Events</h2><div class='event-list'>";
+
     for (int i = 0; i < getEventCapacity(); i++)
     {
         String e = getEvent(i);
+
         if (e.length() > 0)
             html += "<div class='event-item'>• " + e + "</div>";
     }
+
     html += "</div></div>";
 
     html += "<div class='button-container'>";
@@ -156,4 +245,5 @@ void setupWebUI()
     server.on("/wet", handleSimulateWet);
     server.on("/dry", handleSimulateDry);
     server.on("/testemail", handleTestEmail);
+    server.on("/status", handleStatus);
 }
