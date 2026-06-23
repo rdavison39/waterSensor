@@ -4,6 +4,7 @@
 #include "email_manager.h"
 #include "motion_sensor.h"
 #include "settings.h"
+#include "water_sensor.h"
 
 #include <WiFi.h>
 #include <time.h>
@@ -26,16 +27,11 @@ void checkHeartbeat()
     if (timeinfo == nullptr)
         return;
 
-    int dayOfMonth = timeinfo->tm_mday;
     int hour = timeinfo->tm_hour;
     int minute = timeinfo->tm_min;
 
-    // Only send on odd-numbered days
-    if ((dayOfMonth % 2) == 0)
-        return;
-
-    // Only send between 09:00 and 09:09 AM
-    if (hour != 9 || minute > 9)
+    // Only send between 07:00 and 07:09
+    if (hour != 7 || minute > 9)
         return;
 
     char today[16];
@@ -46,6 +42,25 @@ void checkHeartbeat()
     // Already sent today?
     if (getLastHeartbeatDate() == todayString)
         return;
+
+    int intervalDays = getHeartbeatIntervalDays();
+
+    String lastDate = getLastHeartbeatDate();
+
+    // First heartbeat ever
+    if (lastDate.length() > 0)
+    {
+        struct tm lastTm = {};
+        strptime(lastDate.c_str(), "%Y-%m-%d", &lastTm);
+
+        time_t lastTime = mktime(&lastTm);
+
+        double daysSinceLast =
+            difftime(now, lastTime) / (60 * 60 * 24);
+
+        if (daysSinceLast < intervalDays)
+            return;
+    }
 
     Serial.println("[HEARTBEAT] Sending heartbeat email");
 
@@ -62,6 +77,12 @@ void checkHeartbeat()
 
     body += "Water Status: ";
     body += waterDetected ? "WET\n" : "DRY\n";
+
+    body += "Sensor 1: ";
+    body += sensor1Detected ? "WET\n" : "DRY\n";
+
+    body += "Sensor 2: ";
+    body += sensor2Detected ? "WET\n" : "DRY\n";
 
     body += "Motion Status: ";
     body += motionState ? "MOTION DETECTED\n" : "NO MOTION\n";
