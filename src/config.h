@@ -4,49 +4,88 @@
 #include <Arduino.h>
 #include <WebServer.h>
 
-// Pin and firmware configuration
+//====================================================
+// Hardware Configuration
+//====================================================
+
 #define WATER_SENSOR_1_PIN 27
 #define WATER_SENSOR_2_PIN 26
-#define MOTION_PIN 22
+#define MOTION_PIN         22
+
 #define FIRMWARE_VERSION "3.1.0"
 
-// Email / SMTP
+//====================================================
+// SMTP
+//====================================================
+
 #define SMTP_HOST "smtp.gmail.com"
 #define SMTP_PORT 465
 
-// Toggle email sending while testing
+// Toggle all email sending
 static const bool EMAIL_ENABLED = true;
 
-// Forward-declare the web server instance
+//====================================================
+// Web Server
+//====================================================
+
 extern WebServer server;
 
-// Global runtime state (defined in main.cpp)
+//====================================================
+// Water Sensor
+//====================================================
+
 extern bool waterDetected;
 extern bool alarmEmailSent;
-extern bool motionState;
-extern unsigned long bootMillis;
 
 extern String lastAlarmTime;
-extern String lastTestEmailTime;
-extern String lastStatusEmailDate;
-extern int alarmCounter;
-extern int emailCounter;
 
 extern unsigned long lastWetEmailTime;
+
+extern int alarmCounter;
 extern int wetEmailCounter;
+
 extern int currentAlertIntervalIndex;
+
 extern const unsigned long ALERT_INTERVALS[];
 extern const int NUM_ALERT_INTERVALS;
+
+//====================================================
+// Motion Sensor
+//====================================================
+
+extern bool motionState;
+
+extern unsigned long motionCount;
+
+extern unsigned long motionEmailsToday;
+extern unsigned long suppressedMotionCount;
+
+extern unsigned long lastMotionEmailMillis;
+
+extern int motionEmailCooldownMinutes;
+
+extern String lastMotionTime;
+extern String lastMotionEmailTimestamp;
+extern String lastMotionEmailDate;
+
+//====================================================
+// Heartbeat
+//====================================================
 
 extern const int STATUS_EMAIL_DAYS[];
 extern const int NUM_STATUS_DAYS;
 
+//====================================================
+// General
+//====================================================
+
+extern unsigned long bootMillis;
+
+extern String lastTestEmailTime;
+extern String lastStatusEmailDate;
+
+extern int emailCounter;
+
 #define MAX_EVENTS 10
 
-// Motion
-extern unsigned long motionCount;
-extern String lastMotionTime;
-extern String lastMotionEmailTimestamp;
-
-
-#endif // CONFIG_H
+#endif

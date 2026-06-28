@@ -1,5 +1,5 @@
 #include "settings.h"
-
+#include <Arduino.h>
 #include <Preferences.h>
 
 Preferences preferences;
@@ -106,4 +106,19 @@ void setMotionEmailCooldownMinutes(int minutes)
         minutes = 1440;
 
     preferences.putInt("motionCooldown", minutes);
+
+    Serial.print("[SETTINGS] Motion cooldown set to ");
+    Serial.print(minutes);
+    Serial.println(" minutes");
+}
+
+
+String getLastWiFiSSID()
+{
+    return preferences.getString("lastSSID", "");
+}
+
+void setLastWiFiSSID(const String& ssid)
+{
+    preferences.putString("lastSSID", ssid);
 }

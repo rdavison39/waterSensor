@@ -3,24 +3,39 @@
 
 #include <Arduino.h>
 
+//----------------------------------------------------
+// Initialization
+//----------------------------------------------------
 void setupSettings();
 
-String getRecipientEmails();
-void setRecipientEmails(const String& emails);
-
-int getHeartbeatIntervalDays();
-void setHeartbeatIntervalDays(int days);
-
-String getDeviceName();
-void setDeviceName(const String& name);
-
+//----------------------------------------------------
+// Heartbeat Settings
+//----------------------------------------------------
 String getLastHeartbeatDate();
-void setLastHeartbeatDate(const String& date);
+void setLastHeartbeatDate(const String &date);
 
-bool getEmailEnabled();
-void setEmailEnabled(bool enabled);
+//----------------------------------------------------
+// WiFi Settings
+//----------------------------------------------------
+String getLastWiFiSSID();
+void setLastWiFiSSID(const String &ssid);
 
+//----------------------------------------------------
+// Motion Settings
+//----------------------------------------------------
 int getMotionEmailCooldownMinutes();
 void setMotionEmailCooldownMinutes(int minutes);
+
+//----------------------------------------------------
+// Future Settings (v2.5+)
+//----------------------------------------------------
+// bool getMotionEmailEnabled();
+// void setMotionEmailEnabled(bool enabled);
+//
+// bool getWaterEmailEnabled();
+// void setWaterEmailEnabled(bool enabled);
+//
+// bool getHeartbeatEmailEnabled();
+// void setHeartbeatEmailEnabled(bool enabled);
 
 #endif

@@ -12,6 +12,7 @@
 #include "web_ui.h"
 #include "heartbeat.h"
 #include "settings.h"
+#include "wifi_manager.h"
 
 WebServer server(80);
 
@@ -36,10 +37,30 @@ const int NUM_ALERT_INTERVALS = 7;
 
 
 
-// motion
+//====================================================
+// Motion
+//====================================================
+
 unsigned long motionCount = 0;
+
+// Number of motion emails sent today
+unsigned long motionEmailsToday = 0;
+
+// Number of motion detections suppressed during cooldown
+unsigned long suppressedMotionCount = 0;
+
+// millis() when last motion email was sent
+unsigned long lastMotionEmailMillis = 0;
+
+// Configurable cooldown (loaded from Preferences)
+int motionEmailCooldownMinutes = 15;
+
+// Runtime timestamps
 String lastMotionTime = "Never";
 String lastMotionEmailTimestamp = "Never";
+
+// Date used to reset daily email counter
+String lastMotionEmailDate = "";
 
 // Heartbeat
 String lastHeartbeatDate = "";
@@ -50,24 +71,18 @@ void setup()
 
     Serial.begin(115200);
 
-    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-
-    Serial.println();
-    Serial.println("Connecting to WiFi...");
-
     // settings
-    setupSettings();
+setupSettings();
+motionEmailCooldownMinutes = getMotionEmailCooldownMinutes();
 
-    while (WiFi.status() != WL_CONNECTED)
-    {
-        delay(500);
-        Serial.print(".");
-    }
+Serial.print("[SETTINGS] Motion cooldown = ");
+Serial.print(motionEmailCooldownMinutes);
+Serial.println(" minutes");
 
-    Serial.println();
-    Serial.println("WiFi Connected");
-    Serial.print("IP Address: ");
-    Serial.println(WiFi.localIP());
+while (!connectToWiFi())
+{
+    delay(30000);
+}
 
     configTime(-5 * 3600, 3600, "pool.ntp.org", "time.nist.gov");
     Serial.println("Waiting for NTP time sync...");
@@ -96,6 +111,7 @@ void setup()
 void loop()
 {
     server.handleClient();
+    maintainWiFiConnection();
 
     // startup email
     if (!startupEmailSent)
