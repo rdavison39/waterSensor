@@ -9,6 +9,19 @@
 #include <WiFi.h>
 #include <time.h>
 
+static unsigned long getLegacyLastHeartbeatTimestamp(const String& lastDate)
+{
+    if (lastDate.length() == 0)
+        return 0;
+
+    struct tm lastTm = {};
+
+    if (strptime(lastDate.c_str(), "%Y-%m-%d", &lastTm) == nullptr)
+        return 0;
+
+    return (unsigned long)mktime(&lastTm);
+}
+
 void checkHeartbeat()
 {
     static unsigned long lastCheckMillis = 0;
@@ -27,38 +40,27 @@ void checkHeartbeat()
     if (timeinfo == nullptr)
         return;
 
-    int hour = timeinfo->tm_hour;
-    int minute = timeinfo->tm_min;
-
-    // Only send between 07:00 and 07:09
-    if (hour != 7 || minute > 9)
-        return;
-
     char today[16];
     strftime(today, sizeof(today), "%Y-%m-%d", timeinfo);
 
     String todayString = String(today);
 
-    // Already sent today?
-    if (getLastHeartbeatDate() == todayString)
-        return;
+    unsigned long intervalSeconds =
+        getHeartbeatIntervalMinutes() * 60UL;
 
-    int intervalDays = getHeartbeatIntervalDays();
+    unsigned long lastHeartbeatTimestamp =
+        getLastHeartbeatTimestamp();
 
-    String lastDate = getLastHeartbeatDate();
+    if (lastHeartbeatTimestamp == 0)
+        lastHeartbeatTimestamp =
+            getLegacyLastHeartbeatTimestamp(getLastHeartbeatDate());
 
-    // First heartbeat ever
-    if (lastDate.length() > 0)
+    if (lastHeartbeatTimestamp > 0)
     {
-        struct tm lastTm = {};
-        strptime(lastDate.c_str(), "%Y-%m-%d", &lastTm);
+        unsigned long secondsSinceLast =
+            (unsigned long)now - lastHeartbeatTimestamp;
 
-        time_t lastTime = mktime(&lastTm);
-
-        double daysSinceLast =
-            difftime(now, lastTime) / (60 * 60 * 24);
-
-        if (daysSinceLast < intervalDays)
+        if (secondsSinceLast < intervalSeconds)
             return;
     }
 
@@ -108,6 +110,7 @@ void checkHeartbeat()
     sendEmail(subject, body);
 
     setLastHeartbeatDate(todayString);
+    setLastHeartbeatTimestamp((unsigned long)now);
 
     Serial.println("[HEARTBEAT] Heartbeat sent");
 }

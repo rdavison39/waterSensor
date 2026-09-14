@@ -202,8 +202,8 @@ void sendStartupEmail()
     body += "\n\n";
 
     body += "Heartbeat Interval: ";
-    body += String(getHeartbeatIntervalDays());
-    body += " day(s)\n";
+    body += getHeartbeatIntervalDDHHMM();
+    body += " (dd:hh:mm)\n";
 
     body += "Motion Email Cooldown: ";
     body += String(getMotionEmailCooldownMinutes());

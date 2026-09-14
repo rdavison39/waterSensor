@@ -10,5 +10,9 @@ bool isMotionDetected();
 unsigned long getMotionCount();
 String getLastMotionTime();
 String getLastMotionEmailTime();
+unsigned long getMotionEmailsToday();
+unsigned long getSuppressedMotionCount();
+unsigned long getMotionDetectionsDuringCooldown();
+unsigned long getMotionCooldownSecondsRemaining();
 
 #endif // MOTION_SENSOR_H

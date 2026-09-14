@@ -12,7 +12,7 @@
 #define WATER_SENSOR_2_PIN 26
 #define MOTION_PIN         22
 
-#define FIRMWARE_VERSION "3.1.0"
+#define FIRMWARE_VERSION "3.2.0"
 
 //====================================================
 // SMTP
@@ -57,16 +57,19 @@ extern bool motionState;
 
 extern unsigned long motionCount;
 
+// Statistics
 extern unsigned long motionEmailsToday;
 extern unsigned long suppressedMotionCount;
+extern unsigned long motionDetectionsDuringCooldown;
 
+// Timing
 extern unsigned long lastMotionEmailMillis;
 
-extern int motionEmailCooldownMinutes;
-
+// Status
 extern String lastMotionTime;
 extern String lastMotionEmailTimestamp;
 extern String lastMotionEmailDate;
+extern String lastMotionResetDate;
 
 //====================================================
 // Heartbeat

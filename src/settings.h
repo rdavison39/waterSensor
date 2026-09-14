@@ -11,8 +11,23 @@ void setupSettings();
 //----------------------------------------------------
 // Heartbeat Settings
 //----------------------------------------------------
+int getHeartbeatIntervalDays();
+void setHeartbeatIntervalDays(int days);
+unsigned long getHeartbeatIntervalMinutes();
+String getHeartbeatIntervalDDHHMM();
+void setHeartbeatIntervalMinutes(unsigned long minutes);
 String getLastHeartbeatDate();
 void setLastHeartbeatDate(const String &date);
+unsigned long getLastHeartbeatTimestamp();
+void setLastHeartbeatTimestamp(unsigned long timestamp);
+
+//----------------------------------------------------
+// Email Settings
+//----------------------------------------------------
+String getRecipientEmails();
+void setRecipientEmails(const String &emails);
+bool getEmailEnabled();
+void setEmailEnabled(bool enabled);
 
 //----------------------------------------------------
 // WiFi Settings
@@ -24,6 +39,7 @@ void setLastWiFiSSID(const String &ssid);
 // Motion Settings
 //----------------------------------------------------
 int getMotionEmailCooldownMinutes();
+String getMotionEmailCooldownHHMM();
 void setMotionEmailCooldownMinutes(int minutes);
 
 //----------------------------------------------------

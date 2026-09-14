@@ -10,6 +10,115 @@
 
 #include <WiFi.h>
 
+static int parseHHMMToMinutes(String value, int fallbackMinutes)
+{
+    value.trim();
+
+    int colonIndex = value.indexOf(':');
+
+    if (colonIndex < 1)
+        return fallbackMinutes;
+
+    String hoursText = value.substring(0, colonIndex);
+    String minutesText = value.substring(colonIndex + 1);
+
+    hoursText.trim();
+    minutesText.trim();
+
+    if (hoursText.length() == 0 || minutesText.length() != 2)
+        return fallbackMinutes;
+
+    for (unsigned int i = 0; i < hoursText.length(); i++)
+    {
+        if (!isDigit(hoursText.charAt(i)))
+            return fallbackMinutes;
+    }
+
+    for (unsigned int i = 0; i < minutesText.length(); i++)
+    {
+        if (!isDigit(minutesText.charAt(i)))
+            return fallbackMinutes;
+    }
+
+    int hours = hoursText.toInt();
+    int minutes = minutesText.toInt();
+
+    if (hours < 0 || hours > 24)
+        return fallbackMinutes;
+
+    if (minutes < 0 || minutes > 59)
+        return fallbackMinutes;
+
+    if (hours == 24 && minutes != 0)
+        return fallbackMinutes;
+
+    int totalMinutes = (hours * 60) + minutes;
+
+    if (totalMinutes < 1 || totalMinutes > 1440)
+        return fallbackMinutes;
+
+    return totalMinutes;
+}
+
+static unsigned long parseDDHHMMToMinutes(
+    String value,
+    unsigned long fallbackMinutes)
+{
+    value.trim();
+
+    int firstColon = value.indexOf(':');
+    int secondColon = value.indexOf(':', firstColon + 1);
+
+    if (firstColon < 1 || secondColon <= firstColon + 1)
+        return fallbackMinutes;
+
+    String daysText = value.substring(0, firstColon);
+    String hoursText = value.substring(firstColon + 1, secondColon);
+    String minutesText = value.substring(secondColon + 1);
+
+    daysText.trim();
+    hoursText.trim();
+    minutesText.trim();
+
+    if (daysText.length() == 0 ||
+        hoursText.length() != 2 ||
+        minutesText.length() != 2)
+        return fallbackMinutes;
+
+    for (unsigned int i = 0; i < daysText.length(); i++)
+    {
+        if (!isDigit(daysText.charAt(i)))
+            return fallbackMinutes;
+    }
+
+    for (unsigned int i = 0; i < hoursText.length(); i++)
+    {
+        if (!isDigit(hoursText.charAt(i)))
+            return fallbackMinutes;
+    }
+
+    for (unsigned int i = 0; i < minutesText.length(); i++)
+    {
+        if (!isDigit(minutesText.charAt(i)))
+            return fallbackMinutes;
+    }
+
+    unsigned long days = (unsigned long)daysText.toInt();
+    unsigned long hours = (unsigned long)hoursText.toInt();
+    unsigned long minutes = (unsigned long)minutesText.toInt();
+
+    if (days > 365 || hours > 23 || minutes > 59)
+        return fallbackMinutes;
+
+    unsigned long totalMinutes =
+        (days * 24UL * 60UL) + (hours * 60UL) + minutes;
+
+    if (totalMinutes < 1 || totalMinutes > 365UL * 24UL * 60UL)
+        return fallbackMinutes;
+
+    return totalMinutes;
+}
+
 void handleStatus()
 {
     String json = "{";
@@ -30,7 +139,13 @@ void handleStatus()
 
     json += "\"motionCount\":\"" + String(getMotionCount()) + "\",";
     json += "\"lastMotion\":\"" + getLastMotionTime() + "\",";
-    json += "\"lastMotionEmail\":\"" + getLastMotionEmailTime() + "\"";
+    json += "\"lastMotionEmail\":\"" + getLastMotionEmailTime() + "\",";
+    json += "\"motionEmailsToday\":\"" + String(getMotionEmailsToday()) + "\",";
+    json += "\"motionCooldownMinutes\":\"" + String(getMotionEmailCooldownMinutes()) + "\",";
+    json += "\"motionCooldownHHMM\":\"" + getMotionEmailCooldownHHMM() + "\",";
+    json += "\"motionCooldownRemaining\":\"" + formatSecondsToTime(getMotionCooldownSecondsRemaining()) + "\",";
+    json += "\"motionCooldownDetections\":\"" + String(getMotionDetectionsDuringCooldown()) + "\",";
+    json += "\"suppressedMotionCount\":\"" + String(getSuppressedMotionCount()) + "\"";
 
     json += "}";
 
@@ -107,6 +222,21 @@ void handleRoot()
     html += "e=document.getElementById('lastMotionEmail');";
     html += "if(e)e.innerHTML=d.lastMotionEmail;";
 
+    html += "e=document.getElementById('motionEmailsToday');";
+    html += "if(e)e.innerHTML=d.motionEmailsToday;";
+
+    html += "e=document.getElementById('motionCooldownMinutes');";
+    html += "if(e)e.innerHTML=d.motionCooldownHHMM;";
+
+    html += "e=document.getElementById('motionCooldownRemaining');";
+    html += "if(e)e.innerHTML=d.motionCooldownRemaining;";
+
+    html += "e=document.getElementById('motionCooldownDetections');";
+    html += "if(e)e.innerHTML=d.motionCooldownDetections;";
+
+    html += "e=document.getElementById('suppressedMotionCount');";
+    html += "if(e)e.innerHTML=d.suppressedMotionCount;";
+
     html += "console.log('Dashboard updated', d);";
 
     html += "})";
@@ -166,7 +296,7 @@ void handleRoot()
     html += getEmailEnabled() ? "ENABLED" : "DISABLED";
     html += "</div></div>";
     html += "<div class='card'><div class='card-title'>Heartbeat Interval</div><div class='card-value'>";
-    html += String(getHeartbeatIntervalDays()) + " days";
+    html += getHeartbeatIntervalDDHHMM();
     html += "</div></div>";
     html += "<div class='card'><div class='card-title'>Motion Status</div><div class='card-value' id='motionStatus'>";
     html += isMotionDetected() ? "ACTIVE" : "IDLE";
@@ -182,6 +312,26 @@ void handleRoot()
 
     html += "<div class='card'><div class='card-title'>Last Motion Email</div><div class='card-value' id='lastMotionEmail'>";
     html += getLastMotionEmailTime();
+    html += "</div></div>";
+
+    html += "<div class='card'><div class='card-title'>Motion Emails Today</div><div class='card-value' id='motionEmailsToday'>";
+    html += String(getMotionEmailsToday());
+    html += "</div></div>";
+
+    html += "<div class='card'><div class='card-title'>Motion Cooldown</div><div class='card-value' id='motionCooldownMinutes'>";
+    html += getMotionEmailCooldownHHMM();
+    html += "</div></div>";
+
+    html += "<div class='card'><div class='card-title'>Cooldown Remaining</div><div class='card-value' id='motionCooldownRemaining'>";
+    html += formatSecondsToTime(getMotionCooldownSecondsRemaining());
+    html += "</div></div>";
+
+    html += "<div class='card'><div class='card-title'>Motion During Cooldown</div><div class='card-value' id='motionCooldownDetections'>";
+    html += String(getMotionDetectionsDuringCooldown());
+    html += "</div></div>";
+
+    html += "<div class='card'><div class='card-title'>Suppressed Motion Total</div><div class='card-value' id='suppressedMotionCount'>";
+    html += String(getSuppressedMotionCount());
     html += "</div></div>";
 
     if (waterDetected)
@@ -287,19 +437,25 @@ void handleSettings()
 
     html += "<form method='POST' action='/savesettings'>";
 
-    html += "<label>Email Recipients</label>";
+    html += "<label>Email Recipients (comma-separated)</label>";
     html += "<input type='text' name='emails' value='" + getRecipientEmails() + "'>";
 
-    html += "<label>Motion Email Cooldown (Minutes)</label>";
-    html += "<input type='number' min='1' max='1440' ";
+    html += "<label>Motion Email Cooldown (hh:mm)</label>";
+    html += "<input type='text' ";
+    html += "pattern='([0-9]{1,2}):[0-5][0-9]' ";
+    html += "placeholder='00:15' ";
     html += "name='motionCooldown' value='";
-    html += String(getMotionEmailCooldownMinutes());
+    html += getMotionEmailCooldownHHMM();
     html += "'>";
 
-    html += "<label>Heartbeat Interval (Days)</label>";
-    html += "<input type='number' min='1' max='365' name='heartbeat' value='" + String(getHeartbeatIntervalDays()) + "'>";
+    html += "<label>Heartbeat Interval (dd:hh:mm)</label>";
+    html += "<input type='text' ";
+    html += "pattern='([0-9]{1,3}):[0-2][0-9]:[0-5][0-9]' ";
+    html += "placeholder='07:00:00' ";
+    html += "name='heartbeat' value='";
+    html += getHeartbeatIntervalDDHHMM();
+    html += "'>";
 
-    html += "<label>";
     html += "<label style='display:flex;";
     html += "align-items:center;";
     html += "gap:15px;";
@@ -343,13 +499,22 @@ void handleSaveSettings()
 
     if (server.hasArg("heartbeat"))
     {
-        setHeartbeatIntervalDays(server.arg("heartbeat").toInt());
+        unsigned long heartbeatMinutes = parseDDHHMMToMinutes(
+            server.arg("heartbeat"),
+            getHeartbeatIntervalMinutes()
+        );
+
+        setHeartbeatIntervalMinutes(heartbeatMinutes);
     }
     if (server.hasArg("motionCooldown"))
-{
-    setMotionEmailCooldownMinutes(
-        server.arg("motionCooldown").toInt());
-}
+    {
+        int cooldownMinutes = parseHHMMToMinutes(
+            server.arg("motionCooldown"),
+            getMotionEmailCooldownMinutes()
+        );
+
+        setMotionEmailCooldownMinutes(cooldownMinutes);
+    }
 
     bool emailEnabled = server.hasArg("emailEnabled");
     setEmailEnabled(emailEnabled);
