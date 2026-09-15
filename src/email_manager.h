@@ -3,11 +3,33 @@
 
 #include <Arduino.h>
 
-void sendEmail(const String &subject, const String &body);
+//====================================================
+// Generic Email
+//====================================================
+
+void sendEmail(
+    const String &subject,
+    const String &body
+);
+
+//====================================================
+// Water Alarm Emails
+//====================================================
+
 void sendAlarmEmail();
+
 void sendWetAlertEmail();
+
+void sendWaterClearedEmail();
+
+//====================================================
+// Other Emails
+//====================================================
+
 void sendTestEmail();
+
 void sendStatusEmail();
+
 void sendStartupEmail();
 
-#endif // EMAIL_MANAGER_H
+#endif

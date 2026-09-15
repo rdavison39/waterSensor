@@ -6,9 +6,13 @@
 #include "settings.h"
 #include "motion_sensor.h"
 #include "water_sensor.h"
-#include <WiFi.h>
 
+#include <WiFi.h>
 #include <ESP_Mail_Client.h>
+
+//====================================================
+// Generic Email Sender
+//====================================================
 
 void sendEmail(const String &subject, const String &body)
 {
@@ -34,12 +38,19 @@ void sendEmail(const String &subject, const String &body)
     session.login.password = AUTHOR_PASSWORD;
 
     SMTP_Message message;
+
     message.sender.name = "Eldorado Cottage Monitor";
     message.sender.email = AUTHOR_EMAIL;
     message.subject = subject;
+
+    //------------------------------------------------
+    // Recipients
+    //------------------------------------------------
+
     String recipients = getRecipientEmails();
 
     int start = 0;
+
     while (start < recipients.length())
     {
         int comma = recipients.indexOf(',', start);
@@ -61,9 +72,13 @@ void sendEmail(const String &subject, const String &body)
 
         if (email.length() > 0)
         {
-            message.addRecipient(email.c_str(), email.c_str());
+            message.addRecipient(
+                email.c_str(),
+                email.c_str()
+            );
         }
     }
+
     message.text.content = body.c_str();
 
     Serial.println("Connecting to Gmail...");
@@ -82,24 +97,44 @@ void sendEmail(const String &subject, const String &body)
     else
     {
         Serial.println("Email Sent Successfully");
+
         emailCounter++;
-        addEvent("Email sent: " + subject);
+
+        addEvent(
+            "Email sent: " + subject
+        );
     }
 
     smtp.closeSession();
 }
 
+//====================================================
+// Initial Water Alarm Email
+//====================================================
+
 void sendAlarmEmail()
 {
     lastAlarmTime = getCurrentTime();
+
     wetEmailCounter = 1;
-    lastWetEmailTime = (unsigned long)time(nullptr);
+
+    lastWetEmailTime =
+        (unsigned long)time(nullptr);
+
     currentAlertIntervalIndex = 0;
 
-    String body = "WATER DETECTED - ALERT #" + String(wetEmailCounter) + "\n\n";
+    String body =
+        "WATER DETECTED - ALERT #" +
+        String(wetEmailCounter) +
+        "\n\n";
 
-    body += "Time: " + lastAlarmTime + "\n";
-    body += "Status: WET\n\n";
+    body +=
+        "Time: " +
+        lastAlarmTime +
+        "\n";
+
+    body +=
+        "Status: WET\n\n";
 
     body += "Sensor 1: ";
     body += sensor1Detected ? "WET" : "DRY";
@@ -109,22 +144,149 @@ void sendAlarmEmail()
     body += sensor2Detected ? "WET" : "DRY";
     body += "\n\n";
 
-    body += "This is the first alert. Further alerts will be sent on the configured intervals until the leak is fixed.";
+    //------------------------------------------------
+    // Next Alert
+    //------------------------------------------------
 
-    sendEmail("🚨 WATER ALARM DETECTED - Alert #" + String(wetEmailCounter), body);
+    unsigned long nextInterval =
+        ALERT_INTERVALS[
+            currentAlertIntervalIndex
+        ];
+
+    time_t nextAlertTimestamp =
+        lastWetEmailTime +
+        nextInterval;
+
+    struct tm nextAlertInfo;
+
+    localtime_r(
+        &nextAlertTimestamp,
+        &nextAlertInfo
+    );
+
+    char nextAlertBuffer[32];
+
+    strftime(
+        nextAlertBuffer,
+        sizeof(nextAlertBuffer),
+        "%Y-%m-%d %H:%M:%S",
+        &nextAlertInfo
+    );
+
+    body += "Next Alert: ";
+    body += String(nextAlertBuffer);
+    body += "\n";
+
+    body += "Time Until Next Alert: ";
+
+    if (nextInterval < 60)
+    {
+        body += String(nextInterval);
+        body += " seconds";
+    }
+    else if (nextInterval < 3600)
+    {
+        body += String(nextInterval / 60);
+        body += " minute(s)";
+    }
+    else
+    {
+        body += String(nextInterval / 3600);
+        body += " hour(s)";
+
+        unsigned long remainingMinutes =
+            (nextInterval % 3600) / 60;
+
+        if (remainingMinutes > 0)
+        {
+            body += " ";
+            body += String(remainingMinutes);
+            body += " minute(s)";
+        }
+    }
+
+    body += "\n\n";
+
+    body +=
+        "Uptime: " +
+        getUptime() +
+        "\n";
+
+    body +=
+        "Water Alarm Count: " +
+        String(alarmCounter) +
+        "\n\n";
+
+    body +=
+        "This is the first alert. Further alerts "
+        "will be sent on the configured intervals "
+        "until the leak is fixed.";
+
+    sendEmail(
+        "[ALERT] WATER ALARM DETECTED - Alert #" +
+        String(wetEmailCounter),
+        body
+    );
 }
+
+//====================================================
+// Repeating Water Alert Email
+//====================================================
 
 void sendWetAlertEmail()
 {
     wetEmailCounter++;
-    lastWetEmailTime = (unsigned long)time(nullptr);
-    if (currentAlertIntervalIndex < NUM_ALERT_INTERVALS - 1)
+
+    lastWetEmailTime =
+        (unsigned long)time(nullptr);
+
+    //------------------------------------------------
+    // Advance to interval for NEXT alert
+    //------------------------------------------------
+
+    if (currentAlertIntervalIndex <
+        NUM_ALERT_INTERVALS - 1)
+    {
         currentAlertIntervalIndex++;
+    }
 
-    String body = "WATER STILL DETECTED - ALERT #" + String(wetEmailCounter) + "\n\n";
+    unsigned long nextInterval =
+        ALERT_INTERVALS[
+            currentAlertIntervalIndex
+        ];
 
-    body += "Time: " + getCurrentTime() + "\n";
-    body += "Status: WET (ongoing)\n";
+    time_t nextAlertTimestamp =
+        lastWetEmailTime +
+        nextInterval;
+
+    struct tm nextAlertInfo;
+
+    localtime_r(
+        &nextAlertTimestamp,
+        &nextAlertInfo
+    );
+
+    char nextAlertBuffer[32];
+
+    strftime(
+        nextAlertBuffer,
+        sizeof(nextAlertBuffer),
+        "%Y-%m-%d %H:%M:%S",
+        &nextAlertInfo
+    );
+
+    String body =
+        "WATER STILL DETECTED - ALERT #" +
+        String(wetEmailCounter) +
+        "\n\n";
+
+    body +=
+        "Time: " +
+        getCurrentTime() +
+        "\n";
+
+    body +=
+        "Status: WET (ongoing)\n\n";
 
     body += "Sensor 1: ";
     body += sensor1Detected ? "WET" : "DRY";
@@ -132,126 +294,400 @@ void sendWetAlertEmail()
 
     body += "Sensor 2: ";
     body += sensor2Detected ? "WET" : "DRY";
+    body += "\n\n";
+
+    body +=
+        "Uptime: " +
+        getUptime() +
+        "\n";
+
+    body +=
+        "Total Alerts This Session: " +
+        String(wetEmailCounter) +
+        "\n\n";
+
+    body +=
+        "Next Alert: " +
+        String(nextAlertBuffer) +
+        "\n";
+
+    body +=
+        "Time Until Next Alert: ";
+
+    if (nextInterval < 60)
+    {
+        body += String(nextInterval);
+        body += " seconds";
+    }
+    else if (nextInterval < 3600)
+    {
+        body += String(nextInterval / 60);
+        body += " minute(s)";
+    }
+    else
+    {
+        body += String(nextInterval / 3600);
+        body += " hour(s)";
+
+        unsigned long remainingMinutes =
+            (nextInterval % 3600) / 60;
+
+        if (remainingMinutes > 0)
+        {
+            body += " ";
+            body += String(remainingMinutes);
+            body += " minute(s)";
+        }
+    }
+
+    body += "\n\n";
+
+    body +=
+        "The water sensor is still detecting "
+        "moisture. Please check for leaks immediately.";
+
+    sendEmail(
+        "[ALERT] WATER ALERT #" +
+        String(wetEmailCounter) +
+        " - Still Wet",
+        body
+    );
+
+    addEvent(
+        "Wet alert email #" +
+        String(wetEmailCounter) +
+        " sent"
+    );
+}
+
+//====================================================
+// Water Alarm Cleared Email
+//====================================================
+
+void sendWaterClearedEmail()
+{
+    String clearedTime =
+        getCurrentTime();
+
+    String body;
+
+    body +=
+        "WATER ALARM CLEARED\n\n";
+
+    body +=
+        "Time: " +
+        clearedTime +
+        "\n\n";
+
+    body +=
+        "Status: DRY - NORMAL\n\n";
+
+    body += "Sensor 1: ";
+    body +=
+        sensor1Detected ? "WET" : "DRY";
     body += "\n";
 
-    body += "Uptime: " + getUptime() + "\n";
-    body += "Total Alerts This Session: " + String(wetEmailCounter) + "\n\n";
+    body += "Sensor 2: ";
+    body +=
+        sensor2Detected ? "WET" : "DRY";
+    body += "\n\n";
 
-    body += "The water sensor is still detecting moisture. Please check for leaks immediately.";
+    body +=
+        "Both water sensors have returned to DRY.\n";
 
-    sendEmail("🚨 WATER ALERT #" + String(wetEmailCounter) + " - Still Wet", body);
-    addEvent("Wet alert email #" + String(wetEmailCounter) + " sent");
+    body +=
+        "The water alarm has been cleared and "
+        "the system has returned to normal monitoring.\n\n";
+
+    body +=
+        "Alerts During This Event: " +
+        String(wetEmailCounter) +
+        "\n";
+
+    body +=
+        "Total Water Alarms This Session: " +
+        String(alarmCounter) +
+        "\n";
+
+    body +=
+        "Uptime: " +
+        getUptime();
+
+    sendEmail(
+        "[OK] WATER ALARM CLEARED",
+        body
+    );
+
+    addEvent(
+        "Water alarm cleared email sent"
+    );
 }
+
+//====================================================
+// Test Email
+//====================================================
 
 void sendTestEmail()
 {
-    lastTestEmailTime = getCurrentTime();
-    sendEmail("ESP32 Water Sensor Test", "This is a test email sent at " + lastTestEmailTime);
+    lastTestEmailTime =
+        getCurrentTime();
+
+    sendEmail(
+        "ESP32 Water Sensor Test",
+        "This is a test email sent at " +
+        lastTestEmailTime
+    );
 }
+
+//====================================================
+// Status Email
+//====================================================
 
 void sendStatusEmail()
 {
-    String status = waterDetected ? "WET - ALARM ACTIVE" : "DRY - NORMAL";
+    String status =
+        waterDetected
+        ? "WET - ALARM ACTIVE"
+        : "DRY - NORMAL";
 
-    String body = "=== ESP32 Water Sensor Status Report ===\n\n";
-    body += "Firmware: v" + String(FIRMWARE_VERSION) + "\n";
-    body += "Current Status: " + status + "\n";
+    String body =
+        "=== ESP32 Water Sensor Status Report ===\n\n";
+
+    body +=
+        "Firmware: v" +
+        String(FIRMWARE_VERSION) +
+        "\n";
+
+    body +=
+        "Current Status: " +
+        status +
+        "\n";
+
     body += "Sensor 1: ";
-body += sensor1Detected ? "WET" : "DRY";
-body += "\n";
+    body +=
+        sensor1Detected ? "WET" : "DRY";
+    body += "\n";
 
-body += "Sensor 2: ";
-body += sensor2Detected ? "WET" : "DRY";
-body += "\n";
-    body += "Report Time: " + getCurrentTime() + "\n";
-    body += "Uptime: " + getUptime() + "\n";
-    body += "\n--- Counters ---\n";
-    body += "Alarms Triggered: " + String(alarmCounter) + "\n";
-    body += "Emails Sent: " + String(emailCounter) + "\n";
-    body += "WiFi Signal: " + String(WiFi.RSSI()) + " dBm\n";
-    body += "\n--- Last Events ---\n";
-    body += "Last Alarm: " + lastAlarmTime + "\n";
-    body += "Last Test Email: " + lastTestEmailTime + "\n";
-    body += "\nSystem is operational and monitoring for water leaks.";
+    body += "Sensor 2: ";
+    body +=
+        sensor2Detected ? "WET" : "DRY";
+    body += "\n";
 
-    lastStatusEmailDate = getCurrentDate();
-    sendEmail("ESP32 Water Sensor - Status Report", body);
+    body +=
+        "Report Time: " +
+        getCurrentTime() +
+        "\n";
+
+    body +=
+        "Uptime: " +
+        getUptime() +
+        "\n";
+
+    body +=
+        "\n--- Counters ---\n";
+
+    body +=
+        "Alarms Triggered: " +
+        String(alarmCounter) +
+        "\n";
+
+    body +=
+        "Emails Sent: " +
+        String(emailCounter) +
+        "\n";
+
+    body +=
+        "WiFi Signal: " +
+        String(WiFi.RSSI()) +
+        " dBm\n";
+
+    body +=
+        "\n--- Last Events ---\n";
+
+    body +=
+        "Last Alarm: " +
+        lastAlarmTime +
+        "\n";
+
+    body +=
+        "Last Test Email: " +
+        lastTestEmailTime +
+        "\n";
+
+    body +=
+        "\nSystem is operational and monitoring "
+        "for water leaks.";
+
+    lastStatusEmailDate =
+        getCurrentDate();
+
+    sendEmail(
+        "ESP32 Water Sensor - Status Report",
+        body
+    );
+
     addEvent("Status email sent");
 }
+
+//====================================================
+// Startup Email
+//====================================================
+
 void sendStartupEmail()
 {
     String body;
 
-    body += "ESP32 Startup Report\n\n";
+    body +=
+        "ESP32 Startup Report\n\n";
 
-    body += "===== System Information =====\n\n";
+    body +=
+        "===== System Information =====\n\n";
 
-    body += "Time: " + getCurrentTime() + "\n";
-    body += "Firmware: v" + String(FIRMWARE_VERSION) + "\n";
-    body += "IP Address: " + WiFi.localIP().toString() + "\n";
-    body += "WiFi Signal: " + String(WiFi.RSSI()) + " dBm\n\n";
+    body +=
+        "Time: " +
+        getCurrentTime() +
+        "\n";
 
-    body += "===== Configuration =====\n\n";
+    body +=
+        "Firmware: v" +
+        String(FIRMWARE_VERSION) +
+        "\n";
 
-    body += "Email Notifications: ";
-    body += getEmailEnabled() ? "ENABLED" : "DISABLED";
+    body +=
+        "IP Address: " +
+        WiFi.localIP().toString() +
+        "\n";
+
+    body +=
+        "WiFi Signal: " +
+        String(WiFi.RSSI()) +
+        " dBm\n\n";
+
+    body +=
+        "===== Configuration =====\n\n";
+
+    body +=
+        "Email Notifications: ";
+
+    body +=
+        getEmailEnabled()
+        ? "ENABLED"
+        : "DISABLED";
+
     body += "\n\n";
 
-    body += "Recipients:\n";
-    body += getRecipientEmails();
+    body +=
+        "Recipients:\n";
+
+    body +=
+        getRecipientEmails();
+
     body += "\n\n";
 
-    body += "Heartbeat Interval: ";
-    body += getHeartbeatIntervalDDHHMM();
-    body += " (dd:hh:mm)\n";
+    body +=
+        "Heartbeat Interval: ";
 
-    body += "Motion Email Cooldown: ";
-    body += String(getMotionEmailCooldownMinutes());
-    body += " minute(s)\n\n";
+    body +=
+        getHeartbeatIntervalDDHHMM();
 
-    body += "===== Current Status =====\n\n";
+    body +=
+        " (dd:hh:mm)\n";
 
-    body += "Overall Water Status: ";
-    body += waterDetected ? "WET" : "DRY";
+    body +=
+        "Motion Email Cooldown: ";
+
+    body +=
+        String(getMotionEmailCooldownMinutes());
+
+    body +=
+        " minute(s)\n\n";
+
+    body +=
+        "===== Current Status =====\n\n";
+
+    body +=
+        "Overall Water Status: ";
+
+    body +=
+        waterDetected
+        ? "WET"
+        : "DRY";
+
     body += "\n";
 
     body += "Sensor 1: ";
-    body += sensor1Detected ? "WET" : "DRY";
+    body +=
+        sensor1Detected ? "WET" : "DRY";
     body += "\n";
 
     body += "Sensor 2: ";
-    body += sensor2Detected ? "WET" : "DRY";
+    body +=
+        sensor2Detected ? "WET" : "DRY";
     body += "\n";
 
-    body += "Motion Status: ";
-    body += isMotionDetected() ? "ACTIVE" : "IDLE";
+    body +=
+        "Motion Status: ";
+
+    body +=
+        isMotionDetected()
+        ? "ACTIVE"
+        : "IDLE";
+
     body += "\n\n";
 
-    body += "===== Counters =====\n\n";
+    body +=
+        "===== Counters =====\n\n";
 
-    body += "Water Alarms: ";
-    body += String(alarmCounter);
-    body += "\n";
+    body +=
+        "Water Alarms: " +
+        String(alarmCounter) +
+        "\n";
 
-    body += "Motion Events: ";
-    body += String(motionCount);
-    body += "\n";
+    body +=
+        "Motion Events: " +
+        String(motionCount) +
+        "\n";
 
-    body += "Emails Sent: ";
-    body += String(emailCounter);
-    body += "\n\n";
+    body +=
+        "Emails Sent: " +
+        String(emailCounter) +
+        "\n\n";
 
-    body += "===== Last Activity =====\n\n";
+    body +=
+        "===== Last Activity =====\n\n";
 
-    body += "Last Alarm: " + lastAlarmTime + "\n";
-    body += "Last Motion: " + lastMotionTime + "\n";
-    body += "Last Motion Email: " + lastMotionEmailTimestamp + "\n";
-    body += "Last Test Email: " + lastTestEmailTime + "\n";
-    body += "Last Status Email: " + lastStatusEmailDate + "\n\n";
+    body +=
+        "Last Alarm: " +
+        lastAlarmTime +
+        "\n";
 
-    body += "System initialization completed successfully.";
+    body +=
+        "Last Motion: " +
+        lastMotionTime +
+        "\n";
 
-    sendEmail("ESP32 Started Successfully", body);
+    body +=
+        "Last Motion Email: " +
+        lastMotionEmailTimestamp +
+        "\n";
+
+    body +=
+        "Last Test Email: " +
+        lastTestEmailTime +
+        "\n";
+
+    body +=
+        "Last Status Email: " +
+        lastStatusEmailDate +
+        "\n\n";
+
+    body +=
+        "System initialization completed successfully.";
+
+    sendEmail(
+        "ESP32 Started Successfully",
+        body
+    );
 
     addEvent("Startup email sent");
 }

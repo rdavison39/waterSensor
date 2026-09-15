@@ -1,6 +1,7 @@
 ﻿#include <Arduino.h>
 #include <WiFi.h>
 #include <time.h>
+#include <LittleFS.h>
 
 #include "secrets.h"
 #include "config.h"
@@ -71,11 +72,8 @@ unsigned long motionDetectionsDuringCooldown = 0;
 unsigned long lastMotionEmailMillis = 0;
 
 String lastMotionTime = "Never";
-
 String lastMotionEmailTimestamp = "Never";
-
 String lastMotionEmailDate = "";
-
 String lastMotionResetDate = "";
 
 //====================================================
@@ -83,6 +81,83 @@ String lastMotionResetDate = "";
 //====================================================
 
 String lastHeartbeatDate = "";
+
+//====================================================
+// Timezone
+//====================================================
+
+// Eastern Time:
+// EST = UTC-5
+// EDT = UTC-4
+// DST starts second Sunday in March
+// DST ends first Sunday in November
+const char *TIMEZONE_STRING =
+    "EST5EDT,M3.2.0,M11.1.0";
+
+//====================================================
+// LittleFS / ESP-Mail-Client Timezone File
+//====================================================
+
+bool setupLittleFS()
+{
+    Serial.println("================================");
+    Serial.println("Initializing LittleFS...");
+    Serial.println("================================");
+
+    if (!LittleFS.begin(true))
+    {
+        Serial.println("[LITTLEFS] Mount FAILED");
+        return false;
+    }
+
+    Serial.println("[LITTLEFS] Mounted successfully");
+
+    const char *timezoneFile = "/tze.txt";
+
+    bool needsWrite = true;
+
+    if (LittleFS.exists(timezoneFile))
+    {
+        File file = LittleFS.open(timezoneFile, "r");
+
+        if (file)
+        {
+            String existing = file.readString();
+            existing.trim();
+            file.close();
+
+            if (existing == TIMEZONE_STRING)
+            {
+                needsWrite = false;
+                Serial.println("[LITTLEFS] tze.txt already correct");
+            }
+            else
+            {
+                Serial.println("[LITTLEFS] Existing tze.txt has wrong timezone");
+            }
+        }
+    }
+
+    if (needsWrite)
+    {
+        File file = LittleFS.open(timezoneFile, "w");
+
+        if (!file)
+        {
+            Serial.println("[LITTLEFS] Could not create /tze.txt");
+            return false;
+        }
+
+        file.print(TIMEZONE_STRING);
+        file.close();
+
+        Serial.println("[LITTLEFS] Created /tze.txt");
+        Serial.print("[LITTLEFS] Timezone: ");
+        Serial.println(TIMEZONE_STRING);
+    }
+
+    return true;
+}
 
 //====================================================
 // Setup
@@ -94,11 +169,36 @@ void setup()
 
     Serial.begin(115200);
 
+    delay(500);
+
+    Serial.println();
+    Serial.println("================================");
+    Serial.println("ESP32 WATER SENSOR CONTROLLER");
+    Serial.print("Firmware: v");
+    Serial.println(FIRMWARE_VERSION);
+    Serial.println("================================");
+
     //------------------------------------------------
     // Settings
     //------------------------------------------------
 
     setupSettings();
+
+    //------------------------------------------------
+    // LittleFS
+    //------------------------------------------------
+
+    setupLittleFS();
+
+    //------------------------------------------------
+    // Timezone
+    //------------------------------------------------
+
+    setenv("TZ", TIMEZONE_STRING, 1);
+    tzset();
+
+    Serial.print("Timezone: ");
+    Serial.println(TIMEZONE_STRING);
 
     //------------------------------------------------
     // WiFi
@@ -110,12 +210,14 @@ void setup()
     }
 
     //------------------------------------------------
-    // Time
+    // Time / NTP
     //------------------------------------------------
 
-    configTime(-5 * 3600, 3600,
-               "pool.ntp.org",
-               "time.nist.gov");
+    configTzTime(
+        TIMEZONE_STRING,
+        "pool.ntp.org",
+        "time.nist.gov"
+    );
 
     Serial.println("Waiting for NTP time sync...");
 
@@ -128,16 +230,33 @@ void setup()
     }
 
     Serial.println("NTP synchronized");
-    Serial.println(&timeinfo, "%Y-%m-%d %H:%M:%S");
+
+    Serial.println(
+        &timeinfo,
+        "%Y-%m-%d %H:%M:%S"
+    );
 
     //------------------------------------------------
-    // Startup
+    // Startup Event
     //------------------------------------------------
 
-    addEvent("System started - v" + String(FIRMWARE_VERSION));
+    addEvent(
+        "System started - v" +
+        String(FIRMWARE_VERSION)
+    );
+
+    //------------------------------------------------
+    // Sensors
+    //------------------------------------------------
 
     setupWaterSensor();
+
     setupMotionSensor();
+
+    //------------------------------------------------
+    // Web UI
+    //------------------------------------------------
+
     setupWebUI();
 
     server.begin();
@@ -151,7 +270,15 @@ void setup()
 
 void loop()
 {
+    //------------------------------------------------
+    // Web Server
+    //------------------------------------------------
+
     server.handleClient();
+
+    //------------------------------------------------
+    // WiFi
+    //------------------------------------------------
 
     maintainWiFiConnection();
 
@@ -165,7 +292,9 @@ void loop()
 
         if (now > 1700000000)
         {
-            Serial.println("*** SENDING STARTUP EMAIL ***");
+            Serial.println(
+                "*** SENDING STARTUP EMAIL ***"
+            );
 
             sendStartupEmail();
 
@@ -198,6 +327,7 @@ void loop()
     //------------------------------------------------
 
     loopWaterSensor();
+
     loopMotionSensor();
 
     //------------------------------------------------
@@ -205,6 +335,10 @@ void loop()
     //------------------------------------------------
 
     checkHeartbeat();
+
+    //------------------------------------------------
+    // Small Loop Delay
+    //------------------------------------------------
 
     delay(50);
 }
